@@ -14,7 +14,7 @@ export default function ParticlesBackground() {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 50;
+    camera.position.z = 100;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -22,7 +22,7 @@ export default function ParticlesBackground() {
 
     const mouse = new THREE.Vector2(10000, 10000);
 
-    const particleCount = 20000;
+    const particleCount = 5000;
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
 
@@ -40,20 +40,16 @@ export default function ParticlesBackground() {
     for (let i = 0; i < particleCount; i++) {
         const i3 = i * 3;
         
-        const radius = Math.random() * 80;
-        const spinAngle = radius * 3;
-        const branchAngle = (i % 5) / 5 * Math.PI * 2;
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * 20 + 5;
 
-        const randomX = Math.pow(Math.random(), 3) * (Math.random() < 0.5 ? 1 : -1) * 0.5;
-        const randomY = Math.pow(Math.random(), 3) * (Math.random() < 0.5 ? 1 : -1) * 0.5;
-        const randomZ = Math.pow(Math.random(), 3) * (Math.random() < 0.5 ? 1 : -1) * 0.5;
-
-        positions[i3] = Math.cos(branchAngle + spinAngle) * radius + randomX;
-        positions[i3 + 1] = randomY;
-        positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+        positions[i3] = Math.cos(angle) * radius;
+        positions[i3 + 1] = Math.sin(angle) * radius;
+        positions[i3 + 2] = (Math.random() - 0.5) * 200;
         
         const mixedColor = primaryColor.clone();
-        mixedColor.lerp(accentColor, radius / 80);
+        const distanceFromCenter = Math.sqrt(positions[i3]**2 + positions[i3+1]**2) / 25;
+        mixedColor.lerp(accentColor, distanceFromCenter);
 
         colors[i3] = mixedColor.r;
         colors[i3 + 1] = mixedColor.g;
@@ -94,7 +90,10 @@ export default function ParticlesBackground() {
     const animate = () => {
         const elapsedTime = clock.getElapsedTime();
         
-        particles.rotation.y = elapsedTime * 0.1;
+        particles.position.z += 0.2;
+        if(particles.position.z > 100) {
+            particles.position.z = -100;
+        }
 
         camera.position.x += (mouse.x * 5 - camera.position.x) * 0.02;
         camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.02;
