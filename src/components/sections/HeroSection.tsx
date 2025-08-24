@@ -18,7 +18,7 @@ const HeroSection = () => {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 0;
+    camera.position.z = 50;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -27,37 +27,76 @@ const HeroSection = () => {
     const clock = new THREE.Clock();
     const mouse = new THREE.Vector2();
 
-    const starCount = 5000;
-    const particles = new Float32Array(starCount * 3);
-    const colors = new Float32Array(starCount * 3);
-    const starGeometry = new THREE.BufferGeometry();
-    const color = new THREE.Color();
+    const grid_size = 20;
+    const grid_divs = 20;
+    const point_count = (grid_divs + 1) * (grid_divs + 1);
 
-    for (let i = 0; i < starCount; i++) {
-        const i3 = i * 3;
-        particles[i3] = (Math.random() - 0.5) * 10; // x
-        particles[i3 + 1] = (Math.random() - 0.5) * 10; // y
-        particles[i3 + 2] = (Math.random() - 1) * 50; // z
-        
-        color.setHSL(Math.random(), 0.7, 0.8);
-        colors[i3] = color.r;
-        colors[i3 + 1] = color.g;
-        colors[i3 + 2] = color.b;
+    const points = new THREE.BufferGeometry();
+    const positions = new Float32Array(point_count * 3);
+
+    let i = 0;
+    for (let x = 0; x <= grid_divs; x++) {
+      for (let y = 0; y <= grid_divs; y++) {
+        positions[i * 3] = x * (grid_size / grid_divs) - grid_size / 2;
+        positions[i * 3 + 1] = y * (grid_size / grid_divs) - grid_size / 2;
+        positions[i * 3 + 2] = 0;
+        i++;
+      }
+    }
+
+    points.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const pointsMaterial = new THREE.PointsMaterial({ color: 0x1EE0FF, size: 0.1 });
+    const nodes = new THREE.Points(points, pointsMaterial);
+    scene.add(nodes);
+    
+    // Lines
+    const lines = new Set<string>();
+    const lineGeometry = new THREE.BufferGeometry();
+    const linePositions = [];
+
+    for (let i=0; i < point_count; i++) {
+        for (let j=i+1; j < point_count; j++) {
+            if (Math.random() > 0.98) {
+                const p1 = new THREE.Vector3().fromBufferAttribute(points.attributes.position, i);
+                const p2 = new THREE.Vector3().fromBufferAttribute(points.attributes.position, j);
+                if (p1.distanceTo(p2) < grid_size / grid_divs * 3) {
+                    linePositions.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+                    lines.add(`${i},${j}`);
+                }
+            }
+        }
+    }
+
+    lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+    const lineMaterial = new THREE.LineBasicMaterial({ color: 0xA020F0, opacity: 0.2, transparent: true });
+    const traces = new THREE.LineSegments(lineGeometry, lineMaterial);
+    scene.add(traces);
+
+    // Pulses
+    const pulseGeometry = new THREE.BufferGeometry();
+    const pulsePositions = new Float32Array(lines.size * 3);
+    const pulseData = [];
+    let pulseIndex = 0;
+    for (const line of lines) {
+        const [startIdx, endIdx] = line.split(',').map(Number);
+        const p1 = new THREE.Vector3().fromBufferAttribute(points.attributes.position, startIdx);
+        pulsePositions[pulseIndex * 3] = p1.x;
+        pulsePositions[pulseIndex * 3 + 1] = p1.y;
+        pulsePositions[pulseIndex * 3 + 2] = p1.z;
+        pulseData.push({
+            start: startIdx,
+            end: endIdx,
+            progress: Math.random(),
+            speed: Math.random() * 0.005 + 0.001
+        })
+        pulseIndex++;
     }
     
-    starGeometry.setAttribute('position', new THREE.BufferAttribute(particles, 3));
-    starGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    pulseGeometry.setAttribute('position', new THREE.BufferAttribute(pulsePositions, 3));
+    const pulseMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.3, blending: THREE.AdditiveBlending, transparent: true });
+    const pulses = new THREE.Points(pulseGeometry, pulseMaterial);
+    scene.add(pulses);
 
-    const starMaterial = new THREE.PointsMaterial({
-        size: 0.05,
-        vertexColors: true,
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        depthWrite: false,
-    });
-
-    const starField = new THREE.Points(starGeometry, starMaterial);
-    scene.add(starField);
 
     const onMouseMove = (event: MouseEvent) => {
         if (currentMount) {
@@ -69,24 +108,34 @@ const HeroSection = () => {
 
     const animate = () => {
         requestAnimationFrame(animate);
-        const elapsedTime = clock.getElapsedTime();
 
-        const positions = starGeometry.attributes.position.array as Float32Array;
-
-        for (let i = 0; i < starCount; i++) {
-            const i3 = i * 3;
-            positions[i3 + 2] += 0.2; // Move star forward
-
-            if (positions[i3 + 2] > camera.position.z) {
-                positions[i3 + 2] = -50; // Reset star to the back
+        // Animate pulses
+        const pulsePositions = pulseGeometry.attributes.position.array as Float32Array;
+        for (let i=0; i < pulseData.length; i++) {
+            const data = pulseData[i];
+            data.progress += data.speed;
+            if (data.progress > 1) {
+                data.progress = 0;
+                // Swap direction sometimes
+                if (Math.random() > 0.5) {
+                    const temp = data.start;
+                    data.start = data.end;
+                    data.end = temp;
+                }
             }
+            const p1 = new THREE.Vector3().fromBufferAttribute(points.attributes.position, data.start);
+            const p2 = new THREE.Vector3().fromBufferAttribute(points.attributes.position, data.end);
+            const currentPos = new THREE.Vector3().lerpVectors(p1, p2, data.progress);
+            pulsePositions[i * 3] = currentPos.x;
+            pulsePositions[i * 3 + 1] = currentPos.y;
+            pulsePositions[i * 3 + 2] = currentPos.z;
         }
-        
-        starGeometry.attributes.position.needsUpdate = true;
+        pulseGeometry.attributes.position.needsUpdate = true;
+
 
         // Make camera follow mouse
-        camera.position.x += (mouse.x * 2 - camera.position.x) * 0.02;
-        camera.position.y += (mouse.y * 2 - camera.position.y) * 0.02;
+        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.02;
+        camera.position.y += (mouse.y * 5 - camera.position.y) * 0.02;
         camera.lookAt(scene.position);
         
         renderer.render(scene, camera);
