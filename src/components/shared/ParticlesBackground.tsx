@@ -29,8 +29,8 @@ export default function ParticlesBackground() {
       primaryColor = new THREE.Color(computedStyle.getPropertyValue('--primary').trim());
       accentColor = new THREE.Color(computedStyle.getPropertyValue('--accent').trim());
     } catch(e) {
-      primaryColor = new THREE.Color(0x7000FF);
-      accentColor = new THREE.Color(0x00BFFF);
+      primaryColor = new THREE.Color(0xA020F0); // Vibrant purple
+      accentColor = new THREE.Color(0x1EE0FF); // Neon blue
     }
     
     const lines: THREE.Line[] = [];
