@@ -9,7 +9,6 @@ import Link from 'next/link';
 
 const HeroSection = () => {
   const mountRef = useRef<HTMLDivElement>(null);
-  const mouse = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -19,107 +18,83 @@ const HeroSection = () => {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 250;
+    camera.position.set(0, 50, 100);
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
     
-    // Particle setup
-    const particleCount = 200;
-    const particles = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-    const velocities = new Float32Array(particleCount * 3);
+    const clock = new THREE.Clock();
+    const mouse = new THREE.Vector2(-1, -1);
+    const raycaster = new THREE.Raycaster();
 
-    for (let i = 0; i < particleCount * 3; i++) {
-        positions[i] = (Math.random() - 0.5) * 500;
-        velocities[i] = (Math.random() - 0.5) * 0.5;
-    }
+    // Wave setup
+    const waveWidth = 100;
+    const waveHeight = 100;
+    const geometry = new THREE.PlaneGeometry(500, 500, waveWidth, waveHeight);
     
-    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    // We need a copy of original positions to reset calculations each frame
+    const originalPositions = new Float32Array(geometry.attributes.position.array);
 
-    const particleMaterial = new THREE.PointsMaterial({
-        color: 0x1ee0ff, // Neon Blue
+    const material = new THREE.PointsMaterial({
+        color: 0x8800ff,
         size: 2,
         blending: THREE.AdditiveBlending,
         transparent: true,
         sizeAttenuation: true,
     });
     
-    const particleSystem = new THREE.Points(particles, particleMaterial);
-    scene.add(particleSystem);
-    
-    // Line setup
-    const lineMaterial = new THREE.LineBasicMaterial({
-        color: 0xa020f0, // Purple
-        linewidth: 1,
-        transparent: true,
-        opacity: 0,
-    });
-    
-    const lineGeometry = new THREE.BufferGeometry();
-    const linePositions = new Float32Array(particleCount * particleCount * 3);
-    lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
-    const lines = new THREE.LineSegments(lineGeometry, lineMaterial);
-    scene.add(lines);
+    const points = new THREE.Points(geometry, material);
+    points.rotation.x = -Math.PI / 3;
+    scene.add(points);
 
     const onMouseMove = (event: MouseEvent) => {
         if (currentMount) {
-            mouse.current.x = event.clientX - currentMount.clientWidth / 2;
-            mouse.current.y = event.clientY - currentMount.clientHeight / 2;
+            // Convert mouse position to normalized device coordinates (-1 to +1)
+            mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
+            mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
         }
     }
     window.addEventListener('mousemove', onMouseMove);
 
+    let hoverPoint: THREE.Vector3 | null = null;
+
     const animate = () => {
       requestAnimationFrame(animate);
 
-      const posAttribute = particles.getAttribute('position') as THREE.BufferAttribute;
-      const linePosAttribute = lineGeometry.getAttribute('position') as THREE.BufferAttribute;
-      let vertexCount = 0;
-
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        posAttribute.array[i3] += velocities[i3];
-        posAttribute.array[i3 + 1] += velocities[i3 + 1];
-
-        // Bounce off walls
-        if (posAttribute.array[i3] > 250 || posAttribute.array[i3] < -250) velocities[i3] *= -1;
-        if (posAttribute.array[i3+1] > 250 || posAttribute.array[i3+1] < -250) velocities[i3+1] *= -1;
-
-        // Check distance to other particles
-        for(let j = i + 1; j < particleCount; j++){
-            const j3 = j * 3;
-            const dx = posAttribute.array[i3] - posAttribute.array[j3];
-            const dy = posAttribute.array[i3+1] - posAttribute.array[j3+1];
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            if(dist < 50) {
-                linePosAttribute.array[vertexCount * 3] = posAttribute.array[i3];
-                linePosAttribute.array[vertexCount * 3 + 1] = posAttribute.array[i3 + 1];
-                linePosAttribute.array[vertexCount * 3 + 2] = posAttribute.array[i3 + 2];
-                vertexCount++;
-                linePosAttribute.array[vertexCount * 3] = posAttribute.array[j3];
-                linePosAttribute.array[vertexCount * 3 + 1] = posAttribute.array[j3 + 1];
-                linePosAttribute.array[vertexCount * 3 + 2] = posAttribute.array[j3 + 2];
-                vertexCount++;
-            }
-        }
+      const elapsedTime = clock.getElapsedTime();
+      
+      // Update raycaster
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(points);
+      if (intersects.length > 0) {
+        hoverPoint = intersects[0].point;
+      } else {
+        hoverPoint = null;
       }
       
-      linePosAttribute.needsUpdate = true;
-      posAttribute.needsUpdate = true;
-      lineGeometry.setDrawRange(0, vertexCount);
+      const positions = geometry.attributes.position.array as Float32Array;
+      
+      for (let i = 0; i < positions.length; i += 3) {
+        const x = originalPositions[i];
+        const y = originalPositions[i+1];
+        
+        // Base wave animation
+        const z = Math.sin(x * 0.05 + elapsedTime) * 10 + Math.cos(y * 0.05 + elapsedTime) * 10;
+        positions[i+2] = z;
 
-      // Animate line opacity based on distance from center
-      const distanceToCenter = Math.sqrt(camera.position.x * camera.position.x + camera.position.y * camera.position.y);
-      lines.material.opacity = Math.max(0, 1 - distanceToCenter / 400);
+        // Mouse ripple effect
+        if(hoverPoint) {
+            const currentPoint = new THREE.Vector3(x, y, z).applyMatrix4(points.matrixWorld);
+            const dist = currentPoint.distanceTo(hoverPoint);
+            const rippleFactor = Math.max(0, 1 - dist / 50);
+            positions[i+2] += Math.sin(dist * 0.5 - elapsedTime * 5) * 20 * rippleFactor;
+        }
+      }
 
-      // Mouse interaction
-      camera.position.x += (mouse.current.x * 0.2 - camera.position.x) * 0.02;
-      camera.position.y += (-mouse.current.y * 0.2 - camera.position.y) * 0.02;
+      geometry.attributes.position.needsUpdate = true;
+      
       camera.lookAt(scene.position);
-
       renderer.render(scene, camera);
     };
     animate();
