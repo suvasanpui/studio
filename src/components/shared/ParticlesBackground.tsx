@@ -14,7 +14,7 @@ export default function ParticlesBackground() {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 120;
+    camera.position.z = 50;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -22,10 +22,8 @@ export default function ParticlesBackground() {
 
     const mouse = new THREE.Vector2(10000, 10000);
 
-    const particleCount = 150;
-    const particles = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-    const velocities: THREE.Vector3[] = [];
+    const shapes: THREE.Mesh[] = [];
+    const shapeCount = 50;
     
     let color: THREE.Color;
     try {
@@ -33,41 +31,59 @@ export default function ParticlesBackground() {
     } catch(e) {
         color = new THREE.Color(0xA020F0);
     }
-
-
-    for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        positions[i3] = (Math.random() - 0.5) * 300;
-        positions[i3 + 1] = (Math.random() - 0.5) * 300;
-        positions[i3 + 2] = (Math.random() - 0.5) * 300;
-        velocities.push(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, 0));
-    }
-
-    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-    const particleMaterial = new THREE.PointsMaterial({
-        color: color,
-        size: 3,
-        transparent: true,
-        opacity: 0.7,
-        depthWrite: false,
-    });
-
-    const particleSystem = new THREE.Points(particles, particleMaterial);
-    scene.add(particleSystem);
     
-    const linesGeometry = new THREE.BufferGeometry();
-    const linePositions = new Float32Array(particleCount * particleCount * 6);
-    linesGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
-    const lineMaterial = new THREE.LineBasicMaterial({
-        color: color,
-        transparent: true,
-        opacity: 0.1,
-        depthWrite: false,
-    });
-    const linesMesh = new THREE.LineSegments(linesGeometry, lineMaterial);
-    scene.add(linesMesh);
+    const geometries = [
+        new THREE.BoxGeometry(2, 2, 2),
+        new THREE.SphereGeometry(1.5, 32, 16),
+        new THREE.ConeGeometry(1.5, 3, 32),
+        new THREE.TorusGeometry(1, 0.4, 16, 100)
+    ];
 
+    const material = new THREE.MeshStandardMaterial({
+        color: color,
+        roughness: 0.5,
+        metalness: 0.8,
+        emissive: color,
+        emissiveIntensity: 0.2,
+    });
+    
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+
+    const pointLight = new THREE.PointLight(0xffffff, 1);
+    pointLight.position.set(50, 50, 50);
+    scene.add(pointLight);
+
+
+    for (let i = 0; i < shapeCount; i++) {
+        const geometry = geometries[Math.floor(Math.random() * geometries.length)];
+        const shape = new THREE.Mesh(geometry, material);
+        
+        shape.position.set(
+            (Math.random() - 0.5) * 100,
+            (Math.random() - 0.5) * 100,
+            (Math.random() - 0.5) * 100
+        );
+
+        shape.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+        );
+        
+        const scale = Math.random() * 0.5 + 0.5;
+        shape.scale.set(scale, scale, scale);
+
+        (shape as any).velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.1,
+            (Math.random() - 0.5) * 0.1,
+            (Math.random() - 0.5) * 0.1,
+        );
+
+        scene.add(shape);
+        shapes.push(shape);
+    }
+    
     const onMouseMove = (event: MouseEvent) => {
         if (currentMount) {
             mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
@@ -85,43 +101,19 @@ export default function ParticlesBackground() {
     const animate = () => {
         requestAnimationFrame(animate);
 
-        const positions = particleSystem.geometry.attributes.position.array as Float32Array;
-        const linePositions = linesMesh.geometry.attributes.position.array as Float32Array;
+        shapes.forEach(shape => {
+            shape.position.add((shape as any).velocity);
+            shape.rotation.x += 0.005;
+            shape.rotation.y += 0.005;
 
-        for (let i = 0; i < particleCount; i++) {
-            const i3 = i * 3;
-            positions[i3] += velocities[i].x;
-            positions[i3 + 1] += velocities[i].y;
+            if (shape.position.x > 50 || shape.position.x < -50) (shape as any).velocity.x *= -1;
+            if (shape.position.y > 50 || shape.position.y < -50) (shape as any).velocity.y *= -1;
+            if (shape.position.z > 50 || shape.position.z < -50) (shape as any).velocity.z *= -1;
+        });
 
-            if (positions[i3+1] > 150 || positions[i3+1] < -150) velocities[i].y *= -1;
-            if (positions[i3] > 150 || positions[i3] < -150) velocities[i].x *= -1;
-        }
 
-        let lineIndex = 0;
-        for (let i = 0; i < particleCount; i++) {
-            for (let j = i + 1; j < particleCount; j++) {
-                const i3 = i * 3;
-                const j3 = j * 3;
-                const dx = positions[i3] - positions[j3];
-                const dy = positions[i3+1] - positions[j3+1];
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < 50) {
-                    linePositions[lineIndex++] = positions[i3];
-                    linePositions[lineIndex++] = positions[i3+1];
-                    linePositions[lineIndex++] = positions[i3+2];
-                    linePositions[lineIndex++] = positions[j3];
-                    linePositions[lineIndex++] = positions[j3+1];
-                    linePositions[lineIndex++] = positions[j3+2];
-                }
-            }
-        }
-        linesMesh.geometry.attributes.position.needsUpdate = true;
-        (linesMesh.geometry as THREE.BufferGeometry).setDrawRange(0, lineIndex / 3);
-
-        particleSystem.geometry.attributes.position.needsUpdate = true;
-
-        camera.position.x += (mouse.x * 20 - camera.position.x) * 0.02;
-        camera.position.y += (-mouse.y * 20 - camera.position.y) * 0.02;
+        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
+        camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.05;
         camera.lookAt(scene.position);
       
         renderer.render(scene, camera);
@@ -149,7 +141,7 @@ export default function ParticlesBackground() {
             }
         }
         scene.traverse(object => {
-            if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {
+            if (object instanceof THREE.Mesh) {
                 if (object.geometry) {
                     object.geometry.dispose();
                 }
