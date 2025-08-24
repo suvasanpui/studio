@@ -18,83 +18,108 @@ const HeroSection = () => {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.set(0, 50, 100);
+    camera.position.z = 150;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
     
-    const clock = new THREE.Clock();
-    const mouse = new THREE.Vector2(-1, -1);
-    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2(-100, -100);
 
-    // Wave setup
-    const waveWidth = 100;
-    const waveHeight = 100;
-    const geometry = new THREE.PlaneGeometry(500, 500, waveWidth, waveHeight);
-    
-    // We need a copy of original positions to reset calculations each frame
-    const originalPositions = new Float32Array(geometry.attributes.position.array);
+    // Particle setup
+    const particlesCount = 300;
+    const particles = new THREE.BufferGeometry();
+    const posArray = new Float32Array(particlesCount * 3);
+    const velocities = new Float32Array(particlesCount * 3);
 
-    const material = new THREE.PointsMaterial({
+    for (let i = 0; i < particlesCount * 3; i++) {
+        posArray[i] = (Math.random() - 0.5) * 400;
+        velocities[i] = (Math.random() - 0.5) * 0.5;
+    }
+    particles.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+
+    const particleMaterial = new THREE.PointsMaterial({
+        size: 1.5,
         color: 0x8800ff,
-        size: 2,
-        blending: THREE.AdditiveBlending,
         transparent: true,
-        sizeAttenuation: true,
+        blending: THREE.AdditiveBlending,
     });
-    
-    const points = new THREE.Points(geometry, material);
-    points.rotation.x = -Math.PI / 3;
-    scene.add(points);
+    const particleMesh = new THREE.Points(particles, particleMaterial);
+    scene.add(particleMesh);
+
+    // Line setup
+    const lineMaterial = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.1,
+    });
+    const lineGeometry = new THREE.BufferGeometry();
+    const linePositions = new Float32Array(particlesCount * particlesCount * 3);
+    lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+    const linesMesh = new THREE.LineSegments(lineGeometry, lineMaterial);
+    scene.add(linesMesh);
 
     const onMouseMove = (event: MouseEvent) => {
         if (currentMount) {
-            // Convert mouse position to normalized device coordinates (-1 to +1)
             mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
             mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
         }
     }
     window.addEventListener('mousemove', onMouseMove);
 
-    let hoverPoint: THREE.Vector3 | null = null;
-
     const animate = () => {
       requestAnimationFrame(animate);
 
-      const elapsedTime = clock.getElapsedTime();
-      
-      // Update raycaster
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObject(points);
-      if (intersects.length > 0) {
-        hoverPoint = intersects[0].point;
-      } else {
-        hoverPoint = null;
-      }
-      
-      const positions = geometry.attributes.position.array as Float32Array;
-      
-      for (let i = 0; i < positions.length; i += 3) {
-        const x = originalPositions[i];
-        const y = originalPositions[i+1];
-        
-        // Base wave animation
-        const z = Math.sin(x * 0.05 + elapsedTime) * 10 + Math.cos(y * 0.05 + elapsedTime) * 10;
-        positions[i+2] = z;
+      const positions = (particles.attributes.position as THREE.BufferAttribute).array as Float32Array;
+      let vertexpos = 0;
+      let lineVertexpos = 0;
 
-        // Mouse ripple effect
-        if(hoverPoint) {
-            const currentPoint = new THREE.Vector3(x, y, z).applyMatrix4(points.matrixWorld);
-            const dist = currentPoint.distanceTo(hoverPoint);
-            const rippleFactor = Math.max(0, 1 - dist / 50);
-            positions[i+2] += Math.sin(dist * 0.5 - elapsedTime * 5) * 20 * rippleFactor;
+      for (let i = 0; i < particlesCount; i++) {
+          positions[i*3] += velocities[i*3];
+          positions[i*3+1] += velocities[i*3+1];
+
+          // Bounce off walls
+          if (positions[i*3] > 200 || positions[i*3] < -200) velocities[i*3] *= -1;
+          if (positions[i*3+1] > 200 || positions[i*3+1] < -200) velocities[i*3+1] *= -1;
+          
+          // Mouse interaction
+          const dx = (mouse.x * 200) - positions[i*3];
+          const dy = (mouse.y * 200) - positions[i*3+1];
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 50) {
+              const force = (50 - dist) * 0.01;
+              velocities[i*3] -= dx * force;
+              velocities[i*3+1] -= dy * force;
+          }
+
+          // Slow down
+          velocities[i*3] *= 0.99;
+          velocities[i*3+1] *= 0.99;
+      }
+
+      // Update lines
+      const linePositionsArray = (linesMesh.geometry.attributes.position as THREE.BufferAttribute).array as Float32Array;
+      for (let i = 0; i < particlesCount; i++) {
+        for (let j = i + 1; j < particlesCount; j++) {
+            const p1 = new THREE.Vector3(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+            const p2 = new THREE.Vector3(positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2]);
+            const dist = p1.distanceTo(p2);
+            if (dist < 35) {
+                linePositionsArray[lineVertexpos++] = p1.x;
+                linePositionsArray[lineVertexpos++] = p1.y;
+                linePositionsArray[lineVertexpos++] = p1.z;
+                linePositionsArray[lineVertexpos++] = p2.x;
+                linePositionsArray[lineVertexpos++] = p2.y;
+                linePositionsArray[lineVertexpos++] = p2.z;
+            }
         }
       }
-
-      geometry.attributes.position.needsUpdate = true;
       
-      camera.lookAt(scene.position);
+      linesMesh.geometry.setDrawRange(0, lineVertexpos / 3);
+      linesMesh.geometry.attributes.position.needsUpdate = true;
+      (particles.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+
       renderer.render(scene, camera);
     };
     animate();
