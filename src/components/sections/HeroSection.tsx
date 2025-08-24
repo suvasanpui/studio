@@ -18,95 +18,127 @@ const HeroSection = () => {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 20;
+    camera.position.z = 10;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
 
     const mouse = new THREE.Vector2();
-    
-    const helixGroup = new THREE.Group();
-    scene.add(helixGroup);
 
-    const numSpheres = 100;
-    const radius = 5;
-    const height = 15;
-    const turns = 4;
-    
-    // Create the two strands of the helix
-    const sphereGeometry = new THREE.SphereGeometry(0.15, 16, 16);
-    const sphereMaterial1 = new THREE.MeshBasicMaterial({ color: 0x1EE0FF });
-    const sphereMaterial2 = new THREE.MeshBasicMaterial({ color: 0xA020F0 });
+    // Create code texture
+    const createCodeTexture = (code: string) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 256;
+      const context = canvas.getContext('2d');
+      if (!context) return new THREE.CanvasTexture(canvas);
 
-    const spheres1: THREE.Mesh[] = [];
-    const spheres2: THREE.Mesh[] = [];
+      context.fillStyle = 'rgba(10, 20, 40, 0.7)';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      context.font = "20px 'Space Mono', monospace";
+      context.fillStyle = '#88ddff';
+      context.shadowColor = '#00f';
+      context.shadowBlur = 10;
 
-    for (let i = 0; i < numSpheres; i++) {
-        const sphere1 = new THREE.Mesh(sphereGeometry, sphereMaterial1);
-        const sphere2 = new THREE.Mesh(sphereGeometry, sphereMaterial2);
-        
-        const y = (i / numSpheres) * height - height / 2;
-        const angle = (i / numSpheres) * turns * 2 * Math.PI;
+      const lines = code.split('\n');
+      lines.forEach((line, i) => {
+        context.fillText(line, 15, 30 + i * 25);
+      });
 
-        sphere1.position.set(
-            Math.cos(angle) * radius,
-            y,
-            Math.sin(angle) * radius
-        );
+      return new THREE.CanvasTexture(canvas);
+    };
 
-        sphere2.position.set(
-            Math.cos(angle + Math.PI) * radius,
-            y,
-            Math.sin(angle + Math.PI) * radius
-        );
-        
-        helixGroup.add(sphere1);
-        helixGroup.add(sphere2);
-        spheres1.push(sphere1);
-        spheres2.push(sphere2);
+    const codeSnippets = [
+`function factorial(n) {
+  if (n === 0) {
+    return 1;
+  }
+  return n * factorial(n - 1);
+}`,
+`const bubbleSort = (arr) => {
+  let swapped;
+  do {
+    swapped = false;
+    for (let i = 0; i < arr.length; i++) {
+       // ...
     }
+  } while (swapped);
+}`,
+`class Node {
+  constructor(data) {
+    this.data = data;
+    this.next = null;
+  }
+}`,
+`const promise = new Promise((resolve, reject) => {
+  setTimeout(() => {
+    resolve('Success!');
+  }, 1000);
+});`
+    ];
 
-    // Create the rungs of the helix
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 });
-    for (let i = 0; i < numSpheres; i++) {
-        const points = [];
-        points.push(spheres1[i].position);
-        points.push(spheres2[i].position);
-        const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-        const line = new THREE.Line(lineGeometry, lineMaterial);
-        helixGroup.add(line);
+    const codeBlocks: THREE.Mesh[] = [];
+    const planeGeometry = new THREE.PlaneGeometry(8, 4);
+
+    for (let i = 0; i < 20; i++) {
+      const codeTexture = createCodeTexture(codeSnippets[i % codeSnippets.length]);
+      const planeMaterial = new THREE.MeshBasicMaterial({ 
+        map: codeTexture, 
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.DoubleSide
+      });
+      const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+      
+      plane.position.set(
+        (Math.random() - 0.5) * 50,
+        (Math.random() - 0.5) * 30,
+        (Math.random() - 0.5) * 40 - 20
+      );
+
+      plane.rotation.set(
+        Math.random() * Math.PI,
+        Math.random() * Math.PI,
+        Math.random() * Math.PI
+      );
+      
+      scene.add(plane);
+      codeBlocks.push(plane);
     }
-
-
+    
     const onMouseMove = (event: MouseEvent) => {
-        if (currentMount) {
-            mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
-            mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
-        }
+      if (currentMount) {
+        mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
+        mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
+      }
     };
     window.addEventListener('mousemove', onMouseMove);
 
     const clock = new THREE.Clock();
 
     const animate = () => {
-        requestAnimationFrame(animate);
+      requestAnimationFrame(animate);
 
-        const elapsedTime = clock.getElapsedTime();
+      const elapsedTime = clock.getElapsedTime();
 
-        helixGroup.rotation.y = elapsedTime * 0.3;
-        helixGroup.rotation.x = elapsedTime * 0.1;
-        
-        // Make camera follow mouse
-        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
-        camera.position.y += (mouse.y * 5 - camera.position.y) * 0.05;
-        camera.lookAt(scene.position);
-        
-        renderer.render(scene, camera);
+      codeBlocks.forEach(block => {
+        block.rotation.x += 0.001;
+        block.rotation.y += 0.002;
+      });
+
+      // Make camera follow mouse
+      camera.position.x += (mouse.x * 2 - camera.position.x) * 0.02;
+      camera.position.y += (mouse.y * 2 - camera.position.y) * 0.02;
+      camera.lookAt(scene.position);
+      
+      renderer.render(scene, camera);
     };
     animate();
 
     const handleResize = () => {
+        if (!currentMount) return;
         const width = currentMount.clientWidth;
         const height = currentMount.clientHeight;
         renderer.setSize(width, height);
