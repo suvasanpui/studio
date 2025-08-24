@@ -18,56 +18,41 @@ const HeroSection = () => {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 100;
+    camera.position.z = 50;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
     
-    const particleCount = 20000;
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-    
-    const colorInside = new THREE.Color(0x1ee0ff); // Neon Blue
-    const colorOutside = new THREE.Color(0xa020f0); // Vibrant Purple
+    const cubes: (THREE.Mesh & { rotationSpeed?: { x: number; y: number } })[] = [];
+    const cubeCount = 150;
+    const geometry = new THREE.BoxGeometry(2, 2, 2);
 
-    for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        const radius = Math.random() * 200;
-        const spinAngle = radius * 3;
-        const branchAngle = (i % 3) / 3 * Math.PI * 2;
+    const colors = [new THREE.Color(0xa020f0), new THREE.Color(0x1ee0ff)]; // Purple and Neon Blue
 
-        const randomX = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * 20;
-        const randomY = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * 20;
-        const randomZ = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * 20;
+    for (let i = 0; i < cubeCount; i++) {
+      const material = new THREE.MeshBasicMaterial({ color: colors[Math.floor(Math.random() * colors.length)] });
+      const cube = new THREE.Mesh(geometry, material) as THREE.Mesh & { rotationSpeed?: { x: number; y: number } };
 
-        positions[i3] = Math.cos(branchAngle + spinAngle) * radius + randomX;
-        positions[i3 + 1] = randomY;
-        positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
-        
-        const mixedColor = colorInside.clone();
-        mixedColor.lerp(colorOutside, radius / 200);
-        
-        colors[i3] = mixedColor.r;
-        colors[i3 + 1] = mixedColor.g;
-        colors[i3 + 2] = mixedColor.b;
+      cube.position.x = (Math.random() - 0.5) * 100;
+      cube.position.y = (Math.random() - 0.5) * 100;
+      cube.position.z = (Math.random() - 0.5) * 100;
+
+      cube.rotation.x = Math.random() * Math.PI;
+      cube.rotation.y = Math.random() * Math.PI;
+
+      const scale = Math.random() * 0.5 + 0.5;
+      cube.scale.set(scale, scale, scale);
+      
+      cube.rotationSpeed = {
+        x: Math.random() * 0.01,
+        y: Math.random() * 0.01,
+      };
+
+      cubes.push(cube);
+      scene.add(cube);
     }
-
-    const particlesGeometry = new THREE.BufferGeometry();
-    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    const particlesMaterial = new THREE.PointsMaterial({
-        size: 0.5,
-        sizeAttenuation: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        vertexColors: true,
-    });
-    
-    const particles = new THREE.Points(particlesGeometry, particlesMaterial);
-    scene.add(particles);
     
     const onMouseMove = (event: MouseEvent) => {
         mouse.current.x = (event.clientX / window.innerWidth) - 0.5;
@@ -80,12 +65,15 @@ const HeroSection = () => {
     const animate = () => {
       requestAnimationFrame(animate);
       
-      const elapsedTime = clock.getElapsedTime();
-
-      particles.rotation.y = elapsedTime * 0.1;
+      cubes.forEach(cube => {
+          if(cube.rotationSpeed) {
+            cube.rotation.x += cube.rotationSpeed.x;
+            cube.rotation.y += cube.rotationSpeed.y;
+          }
+      });
       
-      camera.position.x += (mouse.current.x * 50 - camera.position.x) * 0.05;
-      camera.position.y += (-mouse.current.y * 50 - camera.position.y) * 0.05;
+      camera.position.x += (mouse.current.x * 20 - camera.position.x) * 0.05;
+      camera.position.y += (-mouse.current.y * 20 - camera.position.y) * 0.05;
       camera.lookAt(scene.position);
 
       renderer.render(scene, camera);
