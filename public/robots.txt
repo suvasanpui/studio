@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://suva-lumina-portfolio.vercel.app/sitemap.xml
