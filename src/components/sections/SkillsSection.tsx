@@ -59,6 +59,7 @@ export default function SkillsSection() {
                     </Card>
                   </div>
                   <div className="absolute left-1/2 -translate-x-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background" />
+                  <div className={cn('absolute top-1/2 h-0.5 w-[calc(50%-2rem)] bg-border', isLeft ? 'right-1/2 translate-x-4' : 'left-1/2 -translate-x-4')} />
                 </motion.div>
               );
             })}
