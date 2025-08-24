@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Code } from "lucide-react";
 import { cn } from '@/lib/utils';
+import { ThemeToggleButton } from './ThemeToggleButton';
 
 const navLinks = [
   { href: "#about", label: "About" },
@@ -43,29 +44,32 @@ export default function Header() {
             </Link>
           ))}
         </nav>
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="md:hidden">
-              <Menu className="h-6 w-6" />
-              <span className="sr-only">Toggle navigation menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right">
-            <div className="grid gap-6 p-6">
-              <Link href="/" className="flex items-center gap-2 font-headline text-2xl font-bold">
-                <Code className="h-8 w-8 text-primary" />
-                <span>Suva</span>
-              </Link>
-              <nav className="grid gap-4">
-                {navLinks.map((link) => (
-                  <Link key={link.href} href={link.href} className="text-xl font-medium text-foreground/80 transition-colors hover:text-primary">
-                    {link.label}
-                  </Link>
-                ))}
-              </nav>
-            </div>
-          </SheetContent>
-        </Sheet>
+        <div className="flex items-center gap-4">
+          <ThemeToggleButton />
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden">
+                <Menu className="h-6 w-6" />
+                <span className="sr-only">Toggle navigation menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right">
+              <div className="grid gap-6 p-6">
+                <Link href="/" className="flex items-center gap-2 font-headline text-2xl font-bold">
+                  <Code className="h-8 w-8 text-primary" />
+                  <span>Suva</span>
+                </Link>
+                <nav className="grid gap-4">
+                  {navLinks.map((link) => (
+                    <Link key={link.href} href={link.href} className="text-xl font-medium text-foreground/80 transition-colors hover:text-primary">
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
     </header>
   );
