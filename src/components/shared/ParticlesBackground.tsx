@@ -14,56 +14,63 @@ export default function ParticlesBackground() {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 5;
+    camera.position.z = 50;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
 
     const mouse = new THREE.Vector2(10000, 10000);
-    
+
     let primaryColor: THREE.Color;
     let accentColor: THREE.Color;
     try {
-      const computedStyle = getComputedStyle(document.documentElement);
-      primaryColor = new THREE.Color(computedStyle.getPropertyValue('--primary').trim());
-      accentColor = new THREE.Color(computedStyle.getPropertyValue('--accent').trim());
+        const computedStyle = getComputedStyle(document.documentElement);
+        const primaryHsl = computedStyle.getPropertyValue('--primary').trim();
+        const accentHsl = computedStyle.getPropertyValue('--accent').trim();
+        primaryColor = new THREE.Color(`hsl(${primaryHsl})`);
+        accentColor = new THREE.Color(`hsl(${accentHsl})`);
     } catch(e) {
-      primaryColor = new THREE.Color(0xA020F0); // Vibrant purple
-      accentColor = new THREE.Color(0x1EE0FF); // Neon blue
+        primaryColor = new THREE.Color(0xA020F0); // Vibrant purple
+        accentColor = new THREE.Color(0x1EE0FF); // Neon blue
+    }
+
+    const lines: THREE.Line[] = [];
+    const lineCount = 50;
+    const maxPoints = 50;
+
+    for (let i = 0; i < lineCount; i++) {
+      const material = new THREE.LineBasicMaterial({ 
+        color: Math.random() > 0.5 ? primaryColor : accentColor,
+        linewidth: 2,
+        transparent: true,
+        opacity: Math.random() * 0.5 + 0.2
+      });
+
+      const points: THREE.Vector3[] = [];
+      const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+      const line = new THREE.Line(lineGeometry, material);
+      
+      const startPoint = new THREE.Vector3(
+        (Math.random() - 0.5) * 100,
+        (Math.random() - 0.5) * 100,
+        (Math.random() - 0.5) * 100
+      );
+      
+      // @ts-ignore
+      line.userData = {
+        points: [startPoint],
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.2,
+          (Math.random() - 0.5) * 0.2,
+          (Math.random() - 0.5) * 0.2,
+        ),
+      };
+
+      scene.add(line);
+      lines.push(line);
     }
     
-    const starCount = 5000;
-    const starGeometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(starCount * 3);
-    const colors = new Float32Array(starCount * 3);
-
-    for (let i = 0; i < starCount; i++) {
-        const i3 = i * 3;
-        positions[i3] = (Math.random() - 0.5) * 200;
-        positions[i3 + 1] = (Math.random() - 0.5) * 200;
-        positions[i3 + 2] = (Math.random() - 0.5) * 200;
-
-        const mixedColor = primaryColor.clone().lerp(accentColor, Math.random());
-        colors[i3] = mixedColor.r;
-        colors[i3 + 1] = mixedColor.g;
-        colors[i3 + 2] = mixedColor.b;
-    }
-
-    starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    starGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    const starMaterial = new THREE.PointsMaterial({
-        size: 0.1,
-        vertexColors: true,
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        opacity: 0.8
-    });
-
-    const stars = new THREE.Points(starGeometry, starMaterial);
-    scene.add(stars);
-
     const onMouseMove = (event: MouseEvent) => {
         if (currentMount) {
             mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
@@ -83,22 +90,50 @@ export default function ParticlesBackground() {
     const animate = () => {
         const delta = clock.getDelta();
         
-        stars.rotation.y += delta * 0.05;
-        stars.rotation.x += delta * 0.02;
+        lines.forEach(line => {
+          // @ts-ignore
+          const userData = line.userData;
+          const currentPoint = userData.points[userData.points.length - 1].clone();
+          currentPoint.add(userData.velocity);
 
-        const positions = stars.geometry.attributes.position as THREE.BufferAttribute;
-        for (let i = 0; i < starCount; i++) {
-            const z = positions.getZ(i);
-            positions.setZ(i, z + delta * 10);
+          // Add some curl noise
+          const time = Date.now() * 0.0005;
+          userData.velocity.x += (Math.random() - 0.5) * 0.05 * Math.sin(time + userData.points.length);
+          userData.velocity.y += (Math.random() - 0.5) * 0.05 * Math.cos(time + userData.points.length);
+          userData.velocity.z += (Math.random() - 0.5) * 0.05;
+          
+          // Constrain velocity
+          userData.velocity.clampLength(0.1, 0.4);
 
-            if (positions.getZ(i) > 100) {
-                positions.setZ(i, -100);
-            }
-        }
-        positions.needsUpdate = true;
+          userData.points.push(currentPoint);
+
+          if (userData.points.length > maxPoints) {
+            userData.points.shift();
+          }
+
+          const boundary = 80;
+          if (Math.abs(currentPoint.x) > boundary || Math.abs(currentPoint.y) > boundary || Math.abs(currentPoint.z) > boundary) {
+            userData.points = [new THREE.Vector3(
+              (Math.random() - 0.5) * 100,
+              (Math.random() - 0.5) * 100,
+              (Math.random() - 0.5) * 100
+            )];
+            userData.velocity.set(
+              (Math.random() - 0.5) * 0.2,
+              (Math.random() - 0.5) * 0.2,
+              (Math.random() - 0.5) * 0.2
+            );
+          }
+
+          line.geometry.setFromPoints(userData.points);
+          line.geometry.attributes.position.needsUpdate = true;
+        });
+
+        scene.rotation.y += delta * 0.05;
+        scene.rotation.x += delta * 0.02;
         
-        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
-        camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.05;
+        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.02;
+        camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.02;
         camera.lookAt(scene.position);
       
         renderer.render(scene, camera);
@@ -126,8 +161,10 @@ export default function ParticlesBackground() {
                 currentMount.removeChild(renderer.domElement);
             }
         }
-        starGeometry.dispose();
-        starMaterial.dispose();
+        lines.forEach(line => {
+          line.geometry.dispose();
+          (line.material as THREE.Material).dispose();
+        });
     };
   }, []);
 
