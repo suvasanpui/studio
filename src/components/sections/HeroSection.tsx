@@ -18,54 +18,60 @@ const HeroSection = () => {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 30;
+    camera.position.z = 100;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
     
-    const characters = ['{', '}', '[', ']', '(', ')', '/', '<', '>', '*', '=', '+', '-', '0', '1'];
-    const font = 'bold 20px "Space Mono", monospace';
-    const characterTextures = characters.map(char => {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d')!;
-        canvas.width = 32;
-        canvas.height = 32;
-        context.font = font;
-        context.fillStyle = '#00ff00'; // Accent color for code
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(char, 16, 16);
-        return new THREE.CanvasTexture(canvas);
-    });
-
-    const particleCount = 1000;
-    const particles = new THREE.Group();
-    scene.add(particles);
+    const particleCount = 20000;
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+    
+    const colorInside = new THREE.Color(0x1ee0ff); // Neon Blue
+    const colorOutside = new THREE.Color(0xa020f0); // Vibrant Purple
 
     for (let i = 0; i < particleCount; i++) {
-        const material = new THREE.SpriteMaterial({ 
-            map: characterTextures[Math.floor(Math.random() * characterTextures.length)],
-            blending: THREE.AdditiveBlending,
-            transparent: true,
-            opacity: 0.7,
-        });
-        const particle = new THREE.Sprite(material);
+        const i3 = i * 3;
+        const radius = Math.random() * 200;
+        const spinAngle = radius * 3;
+        const branchAngle = (i % 3) / 3 * Math.PI * 2;
+
+        const randomX = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * 20;
+        const randomY = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * 20;
+        const randomZ = Math.pow(Math.random(), 2) * (Math.random() < 0.5 ? 1 : -1) * 20;
+
+        positions[i3] = Math.cos(branchAngle + spinAngle) * radius + randomX;
+        positions[i3 + 1] = randomY;
+        positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
         
-        particle.position.set(
-            (Math.random() - 0.5) * 100,
-            (Math.random() - 0.5) * 100,
-            (Math.random() - 0.5) * 100
-        );
-        (particle as any).velocity = new THREE.Vector3(0, -0.1 - Math.random() * 0.1, 0);
+        const mixedColor = colorInside.clone();
+        mixedColor.lerp(colorOutside, radius / 200);
         
-        particles.add(particle);
+        colors[i3] = mixedColor.r;
+        colors[i3 + 1] = mixedColor.g;
+        colors[i3 + 2] = mixedColor.b;
     }
+
+    const particlesGeometry = new THREE.BufferGeometry();
+    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const particlesMaterial = new THREE.PointsMaterial({
+        size: 0.5,
+        sizeAttenuation: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        vertexColors: true,
+    });
+    
+    const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+    scene.add(particles);
     
     const onMouseMove = (event: MouseEvent) => {
-        mouse.current.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.current.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        mouse.current.x = (event.clientX / window.innerWidth) - 0.5;
+        mouse.current.y = (event.clientY / window.innerHeight) - 0.5;
     }
     window.addEventListener('mousemove', onMouseMove);
 
@@ -76,19 +82,10 @@ const HeroSection = () => {
       
       const elapsedTime = clock.getElapsedTime();
 
-      particles.children.forEach(p => {
-        const particle = p as THREE.Sprite & { velocity: THREE.Vector3 };
-        particle.position.add(particle.velocity);
-        if (particle.position.y < -50) {
-            particle.position.y = 50;
-            particle.position.x = (Math.random() - 0.5) * 100;
-        }
-      });
-
-      particles.rotation.y = elapsedTime * 0.05;
+      particles.rotation.y = elapsedTime * 0.1;
       
-      camera.position.x += (mouse.current.x * 5 - camera.position.x) * 0.02;
-      camera.position.y += (mouse.current.y * 5 - camera.position.y) * 0.02;
+      camera.position.x += (mouse.current.x * 50 - camera.position.x) * 0.05;
+      camera.position.y += (-mouse.current.y * 50 - camera.position.y) * 0.05;
       camera.lookAt(scene.position);
 
       renderer.render(scene, camera);
