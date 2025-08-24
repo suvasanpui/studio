@@ -1,64 +1,14 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-
-class Hexagon {
-  x: number;
-  y: number;
-  size: number;
-  targetOpacity: number;
-  opacity: number;
-
-  constructor(x: number, y: number, size: number) {
-    this.x = x;
-    this.y = y;
-    this.size = size;
-    this.targetOpacity = 0.1;
-    this.opacity = 0.1;
-  }
-
-  draw(ctx: CanvasRenderingContext2D, color: string) {
-    ctx.save();
-    ctx.globalAlpha = this.opacity;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const angle = (Math.PI / 3) * i;
-      const x_i = this.x + this.size * Math.cos(angle);
-      const y_i = this.y + this.size * Math.sin(angle);
-      if (i === 0) {
-        ctx.moveTo(x_i, y_i);
-      } else {
-        ctx.lineTo(x_i, y_i);
-      }
-    }
-    ctx.closePath();
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  update() {
-    // Smoothly transition to the target opacity
-    this.opacity += (this.targetOpacity - this.opacity) * 0.05;
-  }
-}
+import * as THREE from 'three';
 
 export default function ParticlesBackground() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const mousePos = useRef({ x: -1000, y: -1000 });
+  const mountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let width = canvas.parentElement!.clientWidth;
-    let height = canvas.parentElement!.clientHeight;
-    canvas.width = width;
-    canvas.height = height;
+    if (!mountRef.current) return;
+    const mount = mountRef.current;
 
     let primaryColor: string;
     try {
@@ -69,85 +19,86 @@ export default function ParticlesBackground() {
     } catch(e) {
       primaryColor = `hsl(277, 87%, 53%)`;
     }
-    
-    let hexagons: Hexagon[] = [];
-    const hexSize = 30;
-    const hexHeight = hexSize * Math.sqrt(3);
-    const hexWidth = hexSize * 2;
-    const vertDist = hexHeight;
-    const horizDist = hexWidth * 3/4;
 
-    const init = () => {
-      hexagons = [];
-      const rows = Math.ceil(height / vertDist) + 1;
-      const cols = Math.ceil(width / horizDist) + 1;
+    // Scene
+    const scene = new THREE.Scene();
 
-      for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-          const x = col * horizDist;
-          const y = row * vertDist + (col % 2 === 1 ? vertDist / 2 : 0);
-          hexagons.push(new Hexagon(x, y, hexSize));
-        }
-      }
-    };
+    // Camera
+    const camera = new THREE.PerspectiveCamera(75, mount.clientWidth / mount.clientHeight, 0.1, 1000);
+    camera.position.z = 5;
 
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(mount.clientWidth, mount.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    mount.appendChild(renderer.domElement);
+
+    // Particles
+    const particlesCount = 5000;
+    const positions = new Float32Array(particlesCount * 3);
+
+    for (let i = 0; i < particlesCount * 3; i++) {
+      positions[i] = (Math.random() - 0.5) * 10;
+    }
+
+    const particlesGeometry = new THREE.BufferGeometry();
+    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const particlesMaterial = new THREE.PointsMaterial({
+      color: primaryColor,
+      size: 0.02,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      opacity: 0.7,
+      depthWrite: false,
+    });
+
+    const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+    scene.add(particles);
+
+    // Mouse tracking
+    const mouse = new THREE.Vector2();
     const onMouseMove = (event: MouseEvent) => {
-      if (canvas) {
-        const rect = canvas.getBoundingClientRect();
-        mousePos.current = {
-            x: event.clientX - rect.left,
-            y: event.clientY - rect.top,
-        };
-      }
+        // Normalize mouse coordinates
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     };
     window.addEventListener('mousemove', onMouseMove);
 
-    const onMouseOut = () => {
-      mousePos.current = { x: -1000, y: -1000 };
-    };
-    canvas.addEventListener('mouseout', onMouseOut);
-    
-    let frameId: number;
+
+    // Animation
+    const clock = new THREE.Clock();
     const animate = () => {
-        ctx.clearRect(0, 0, width, height);
+      const elapsedTime = clock.getElapsedTime();
 
-        hexagons.forEach(hex => {
-            const dx = hex.x - mousePos.current.x;
-            const dy = hex.y - mousePos.current.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            const maxDist = 200;
-            const mappedOpacity = Math.max(0.1, 1 - (dist / maxDist));
-            hex.targetOpacity = mappedOpacity;
-
-            hex.update();
-            hex.draw(ctx, primaryColor);
-        });
-
-      frameId = requestAnimationFrame(animate);
+      // Update particles
+      particles.rotation.y = elapsedTime * 0.05 + mouse.x * 0.2;
+      particles.rotation.x = elapsedTime * 0.05 + mouse.y * 0.2;
+      
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
     };
 
-    const handleResize = () => {
-      if (!canvas.parentElement) return;
-      width = canvas.parentElement.clientWidth;
-      height = canvas.parentElement.clientHeight;
-      canvas.width = width;
-      canvas.height = height;
-      init();
-    };
-
-    init();
     animate();
 
+    // Handle resize
+    const handleResize = () => {
+      camera.aspect = mount.clientWidth / mount.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(mount.clientWidth, mount.clientHeight);
+    };
     window.addEventListener('resize', handleResize);
 
-    return () => {
-      cancelAnimationFrame(frameId);
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mousemove', onMouseMove);
-      canvas.removeEventListener('mouseout', onMouseOut);
-    };
-  }, []);
 
-  return <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full z-0" />;
+    // Cleanup
+    return () => {
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('mousemove', onMouseMove);
+        if(mount && renderer.domElement){
+            mount.removeChild(renderer.domElement);
+        }
+    };
+  }, [ ]);
+
+  return <div ref={mountRef} className="absolute top-0 left-0 w-full h-full z-0" />;
 }
