@@ -1,74 +1,92 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import * as THREE from 'three';
+
+class Ball {
+  x: number;
+  y: number;
+  r: number;
+  vx: number;
+  vy: number;
+  color: string;
+
+  constructor(x: number, y: number, r: number, color: string) {
+    this.x = x;
+    this.y = y;
+    this.r = r;
+    this.vx = (Math.random() - 0.5) * 2;
+    this.vy = (Math.random() - 0.5) * 2;
+    this.color = color;
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+  }
+
+  update(width: number, height: number, mouse: { x: number; y: number }) {
+    this.x += this.vx;
+    this.y += this.vy;
+
+    if (this.x < this.r || this.x > width - this.r) this.vx *= -1;
+    if (this.y < this.r || this.y > height - this.r) this.vy *= -1;
+
+    // Mouse interaction
+    const dx = this.x - mouse.x;
+    const dy = this.y - mouse.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 150) {
+      this.x += dx / dist * 0.5;
+      this.y += dy / dist * 0.5;
+    }
+  }
+}
 
 export default function ParticlesBackground() {
-  const mountRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (!mountRef.current) return;
+    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    const currentMount = mountRef.current;
-    
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 50;
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    currentMount.appendChild(renderer.domElement);
+    let width = canvas.parentElement!.clientWidth;
+    let height = canvas.parentElement!.clientHeight;
+    canvas.width = width;
+    canvas.height = height;
 
-    const mouse = new THREE.Vector2(0, 0);
+    let primaryColorHsl: string;
+    let accentColorHsl: string;
 
-    let primaryColor: THREE.Color;
-    let accentColor: THREE.Color;
     try {
       const computedStyle = getComputedStyle(document.documentElement);
-      const primaryHsl = computedStyle.getPropertyValue('--primary').trim();
-      const accentHsl = computedStyle.getPropertyValue('--accent').trim();
-      primaryColor = new THREE.Color(`hsl(${primaryHsl})`);
-      accentColor = new THREE.Color(`hsl(${accentHsl})`);
+      primaryColorHsl = `hsl(${computedStyle.getPropertyValue('--primary').trim()})`;
+      accentColorHsl = `hsl(${computedStyle.getPropertyValue('--accent').trim()})`;
     } catch(e) {
-      primaryColor = new THREE.Color(0xA020F0);
-      accentColor = new THREE.Color(0x1EE0FF);
+      primaryColorHsl = '#A020F0';
+      accentColorHsl = '#1EE0FF';
     }
 
-    const cubes: THREE.Mesh[] = [];
-    const cubeCount = 50;
-
-    for (let i = 0; i < cubeCount; i++) {
-        const size = Math.random() * 3 + 1;
-        const geometry = new THREE.BoxGeometry(size, size, size);
-        const material = new THREE.MeshBasicMaterial({
-            color: Math.random() > 0.5 ? primaryColor : accentColor,
-            transparent: true,
-            opacity: Math.random() * 0.5 + 0.2
-        });
-        const cube = new THREE.Mesh(geometry, material);
-
-        cube.position.x = (Math.random() - 0.5) * 100;
-        cube.position.y = (Math.random() - 0.5) * 100;
-        cube.position.z = (Math.random() - 0.5) * 100;
-
-        cube.rotation.x = Math.random() * Math.PI;
-        cube.rotation.y = Math.random() * Math.PI;
-        
-        const velocity = new THREE.Vector3(
-            (Math.random() - 0.5) * 0.05,
-            (Math.random() - 0.5) * 0.05,
-            (Math.random() - 0.5) * 0.05
-        );
-        (cube as any).velocity = velocity;
-
-        cubes.push(cube);
-        scene.add(cube);
+    const balls: Ball[] = [];
+    const numBalls = 20;
+    for (let i = 0; i < numBalls; i++) {
+      balls.push(new Ball(
+        Math.random() * width,
+        Math.random() * height,
+        Math.random() * 30 + 15,
+        Math.random() > 0.5 ? primaryColorHsl : accentColorHsl
+      ));
     }
-    
+
+    const mouse = { x: -1000, y: -1000 };
     const onMouseMove = (event: MouseEvent) => {
-      if (currentMount) {
-        mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
-        mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = event.clientX - rect.left;
+        mouse.y = event.clientY - rect.top;
       }
     };
     window.addEventListener('mousemove', onMouseMove);
@@ -77,33 +95,25 @@ export default function ParticlesBackground() {
 
     const animate = () => {
       frameId = requestAnimationFrame(animate);
-
-      cubes.forEach(cube => {
-          cube.rotation.x += (cube as any).velocity.x;
-          cube.rotation.y += (cube as any).velocity.y;
-          
-          cube.position.add((cube as any).velocity);
-
-          if (cube.position.x > 50 || cube.position.x < -50) (cube as any).velocity.x *= -1;
-          if (cube.position.y > 50 || cube.position.y < -50) (cube as any).velocity.y *= -1;
-          if (cube.position.z > 50 || cube.position.z < -50) (cube as any).velocity.z *= -1;
+      ctx.clearRect(0, 0, width, height);
+      
+      ctx.filter = 'blur(30px) contrast(30)';
+      
+      balls.forEach(ball => {
+        ball.update(width, height, mouse);
+        ball.draw(ctx);
       });
       
-      camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
-      camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.05;
-      camera.lookAt(scene.position);
-
-      renderer.render(scene, camera);
+      ctx.filter = 'none';
     };
     animate();
 
     const handleResize = () => {
-      if (!currentMount) return;
-      const width = currentMount.clientWidth;
-      const height = currentMount.clientHeight;
-      renderer.setSize(width, height);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
+      if (!canvas.parentElement) return;
+      width = canvas.parentElement.clientWidth;
+      height = canvas.parentElement.clientHeight;
+      canvas.width = width;
+      canvas.height = height;
     };
     window.addEventListener('resize', handleResize);
 
@@ -111,17 +121,8 @@ export default function ParticlesBackground() {
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', onMouseMove);
-      if (currentMount && renderer.domElement) {
-        currentMount.removeChild(renderer.domElement);
-      }
-      cubes.forEach(cube => {
-          scene.remove(cube);
-          cube.geometry.dispose();
-          (cube.material as THREE.Material).dispose();
-      });
-      scene.clear();
     };
   }, []);
 
-  return <div ref={mountRef} className="absolute top-0 left-0 w-full h-full z-0" />;
+  return <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full z-0" />;
 }
