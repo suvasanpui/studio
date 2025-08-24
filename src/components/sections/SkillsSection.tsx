@@ -2,8 +2,6 @@
 
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
-import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js';
 import { motion } from 'framer-motion';
 import AnimatedSection from '../shared/AnimatedSection';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,99 +34,73 @@ export default function SkillsSection() {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 75;
+    camera.position.z = 50;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
 
-    const loader = new FontLoader();
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    
-    const streams: { x: number, y: number, speed: number, text: THREE.Mesh, chars: THREE.Mesh[] }[] = [];
-    const streamCount = 200;
-    const streamLength = 20;
+    const mouse = new THREE.Vector2();
 
-    let font: import('three').Font;
+    const cubes: THREE.Mesh[] = [];
+    const cubeCount = 100;
+    const cubeMaterials = [
+        new THREE.MeshBasicMaterial({ color: 0x9932CC, transparent: true, opacity: 0.8 }),
+        new THREE.MeshBasicMaterial({ color: 0x8A2BE2, transparent: true, opacity: 0.8 }),
+        new THREE.MeshBasicMaterial({ color: 0xDA70D6, transparent: true, opacity: 0.8 }),
+    ];
 
-    loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (loadedFont) => {
-        font = loadedFont;
-        initStreams();
-    });
-
-    function createChar(char: string) {
-        const geometry = new TextGeometry(char, {
-            font: font,
-            size: 1.5,
-            height: 0.1,
-        });
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 1 });
-        return new THREE.Mesh(geometry, material);
+    for (let i = 0; i < cubeCount; i++) {
+        const geometry = new THREE.BoxGeometry(
+            Math.random() * 3 + 1,
+            Math.random() * 3 + 1,
+            Math.random() * 3 + 1
+        );
+        const material = cubeMaterials[Math.floor(Math.random() * cubeMaterials.length)];
+        const cube = new THREE.Mesh(geometry, material);
+        cube.position.set(
+            (Math.random() - 0.5) * 150,
+            (Math.random() - 0.5) * 150,
+            (Math.random() - 0.5) * 150
+        );
+        cube.rotation.set(
+            Math.random() * Math.PI * 2,
+            Math.random() * Math.PI * 2,
+            Math.random() * Math.PI * 2
+        );
+        (cube as any).rotationSpeed = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.01,
+            (Math.random() - 0.5) * 0.01,
+            (Math.random() - 0.5) * 0.01
+        );
+        scene.add(cube);
+        cubes.push(cube);
     }
     
-    function initStreams() {
-        for (let i = 0; i < streamCount; i++) {
-            const x = (Math.random() - 0.5) * 200;
-            const y = Math.random() * 200 + 100;
-            const speed = Math.random() * 0.4 + 0.1;
-            
-            const charMeshes: THREE.Mesh[] = [];
-            for (let j = 0; j < streamLength; j++) {
-                const char = chars[Math.floor(Math.random() * chars.length)];
-                const mesh = createChar(char);
-                mesh.position.set(x, y - j * 2.5, 0);
-                
-                const material = mesh.material as THREE.MeshBasicMaterial;
-                if (j === 0) {
-                    material.color.set(0xffffff); // Head character is white
-                    material.opacity = 1;
-                } else {
-                    material.opacity = 1 - j / streamLength;
-                }
-                
-                scene.add(mesh);
-                charMeshes.push(mesh);
-            }
-            streams.push({ x, y, speed, text: charMeshes[0], chars: charMeshes });
+    const onMouseMove = (event: MouseEvent) => {
+        if (currentMount) {
+            mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
+            mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
         }
-    }
-
+    };
+    window.addEventListener('mousemove', onMouseMove);
 
     const animate = () => {
         requestAnimationFrame(animate);
 
-        streams.forEach(stream => {
-            stream.y -= stream.speed;
-            if (stream.y < -100) {
-                stream.y = Math.random() * 200 + 100;
-                stream.x = (Math.random() - 0.5) * 200;
-            }
-
-            stream.chars.forEach((charMesh, index) => {
-                charMesh.position.y = stream.y - index * 2.5;
-                charMesh.position.x = stream.x;
-                
-                // Randomly change character
-                if (Math.random() > 0.99) {
-                    const newChar = chars[Math.floor(Math.random() * chars.length)];
-                    (charMesh.geometry as TextGeometry).dispose();
-                    charMesh.geometry = new TextGeometry(newChar, { font: font, size: 1.5, height: 0.1 });
-                }
-            });
+        cubes.forEach(cube => {
+            cube.rotation.x += (cube as any).rotationSpeed.x;
+            cube.rotation.y += (cube as any).rotationSpeed.y;
+            cube.rotation.z += (cube as any).rotationSpeed.z;
         });
+
+        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
+        camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.05;
+        camera.lookAt(scene.position);
       
         renderer.render(scene, camera);
     };
-    
-    let animationFrameId: number;
-    const startAnimation = () => {
-      if (!font) {
-        animationFrameId = requestAnimationFrame(startAnimation);
-      } else {
-        animate();
-      }
-    }
-    startAnimation();
+    animate();
 
 
     const handleResize = () => {
@@ -144,21 +116,18 @@ export default function SkillsSection() {
 
     return () => {
         window.removeEventListener('resize', handleResize);
+        window.removeEventListener('mousemove', onMouseMove);
         if (currentMount && renderer.domElement) {
             currentMount.removeChild(renderer.domElement);
         }
-        cancelAnimationFrame(animationFrameId);
-        // Dispose of Three.js objects
-        streams.forEach(stream => {
-            stream.chars.forEach(charMesh => {
-                scene.remove(charMesh);
-                charMesh.geometry.dispose();
-                if (Array.isArray(charMesh.material)) {
-                    charMesh.material.forEach(m => m.dispose());
-                } else {
-                    charMesh.material.dispose();
-                }
-            });
+        cubes.forEach(cube => {
+            scene.remove(cube);
+            cube.geometry.dispose();
+            if (Array.isArray(cube.material)) {
+                cube.material.forEach(m => m.dispose());
+            } else {
+                cube.material.dispose();
+            }
         });
     };
   }, []);
