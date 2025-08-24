@@ -28,92 +28,109 @@ export default function SkillsSection() {
 
   useEffect(() => {
     if (!mountRef.current) return;
+
     const currentMount = mountRef.current;
 
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 10;
+    camera.position.z = 50;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
 
-    // Starfield
-    const starCount = 10000;
-    const starGeometry = new THREE.BufferGeometry();
-    const starPositions = new Float32Array(starCount * 3);
-    const starColors = new Float32Array(starCount * 3);
+    const mouse = new THREE.Vector2();
 
-    const baseColor = new THREE.Color('hsl(var(--primary))');
+    const particleCount = 20000;
+    const particles = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
 
-    for (let i = 0; i < starCount; i++) {
+    const colorPalette = [
+      new THREE.Color(0xDA70D6), // Orchid
+      new THREE.Color(0x9932CC), // DarkOrchid
+      new THREE.Color(0x4B0082), // Indigo
+      new THREE.Color(0x8A2BE2)  // BlueViolet
+    ];
+    
+    for (let i = 0; i < particleCount; i++) {
         const i3 = i * 3;
-        starPositions[i3] = (Math.random() - 0.5) * 100;
-        starPositions[i3 + 1] = (Math.random() - 0.5) * 100;
-        starPositions[i3 + 2] = (Math.random() - 0.5) * 100;
+        positions[i3] = (Math.random() - 0.5) * 100;
+        positions[i3 + 1] = (Math.random() - 0.5) * 100;
+        positions[i3 + 2] = (Math.random() - 0.5) * 100;
 
-        const color = new THREE.Color(baseColor);
-        color.lerp(new THREE.Color(0xffffff), Math.random() * 0.5);
-        starColors[i3] = color.r;
-        starColors[i3 + 1] = color.g;
-        starColors[i3 + 2] = color.b;
+        const color = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+        colors[i3] = color.r;
+        colors[i3 + 1] = color.g;
+        colors[i3 + 2] = color.b;
     }
 
-    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    const starMaterial = new THREE.PointsMaterial({
-        size: 0.05,
+    const particleMaterial = new THREE.PointsMaterial({
+        size: 0.25,
         vertexColors: true,
+        depthWrite: false,
         blending: THREE.AdditiveBlending,
-        transparent: true,
-        opacity: 0.8
     });
 
-    const starfield = new THREE.Points(starGeometry, starMaterial);
-    scene.add(starfield);
-
-    const mouse = new THREE.Vector2();
-    const handleMouseMove = (event: MouseEvent) => {
-        const rect = currentMount.getBoundingClientRect();
-        mouse.x = ((event.clientX - rect.left) / currentMount.clientWidth) * 2 - 1;
-        mouse.y = -((event.clientY - rect.top) / currentMount.clientHeight) * 2 + 1;
-    };
-    window.addEventListener('mousemove', handleMouseMove);
+    const particleSystem = new THREE.Points(particles, particleMaterial);
+    scene.add(particleSystem);
     
+    const onMouseMove = (event: MouseEvent) => {
+        if (currentMount) {
+            mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
+            mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
+        }
+    };
+    window.addEventListener('mousemove', onMouseMove);
+
     const clock = new THREE.Clock();
 
     const animate = () => {
         requestAnimationFrame(animate);
 
         const elapsedTime = clock.getElapsedTime();
-        starfield.position.z = (elapsedTime * 0.1) % 5;
         
-        // Subtle mouse interaction
-        camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.02;
-        camera.position.y += (-mouse.y * 0.5 - camera.position.y) * 0.02;
-        camera.lookAt(scene.position);
+        particleSystem.rotation.y = elapsedTime * 0.05;
 
+        // Animate particles
+        const positions = particleSystem.geometry.attributes.position.array as Float32Array;
+        for (let i = 0; i < particleCount; i++) {
+            const i3 = i * 3;
+            const x = positions[i3];
+            positions[i3+1] += Math.sin(elapsedTime + x) * 0.01;
+        }
+        particleSystem.geometry.attributes.position.needsUpdate = true;
+
+        // Camera interaction
+        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
+        camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.05;
+        camera.lookAt(scene.position);
+      
         renderer.render(scene, camera);
     };
-
     animate();
 
     const handleResize = () => {
-      if (!currentMount) return;
-      camera.aspect = currentMount.clientWidth / currentMount.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
+        if (!currentMount) return;
+        const width = currentMount.clientWidth;
+        const height = currentMount.clientHeight;
+        renderer.setSize(width, height);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
     };
     window.addEventListener('resize', handleResize);
+    handleResize();
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mousemove', handleMouseMove);
-      if (currentMount) {
-        currentMount.removeChild(renderer.domElement);
-      }
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('mousemove', onMouseMove);
+        if (currentMount && renderer.domElement) {
+            currentMount.removeChild(renderer.domElement);
+        }
     };
   }, []);
 
