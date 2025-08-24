@@ -3,67 +3,6 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-class Branch {
-  points: THREE.Vector3[];
-  velocity: THREE.Vector3;
-  lifespan: number;
-  maxLife: number;
-  isDead: boolean;
-  line: THREE.Line;
-  material: THREE.LineBasicMaterial;
-  geometry: THREE.BufferGeometry;
-
-  constructor(startPoint: THREE.Vector3, velocity: THREE.Vector3, color: THREE.Color) {
-    this.points = [startPoint];
-    this.velocity = velocity;
-    this.maxLife = 100 + Math.random() * 100;
-    this.lifespan = this.maxLife;
-    this.isDead = false;
-
-    this.material = new THREE.LineBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 1,
-      linewidth: 2,
-    });
-    this.geometry = new THREE.BufferGeometry().setFromPoints(this.points);
-    this.line = new THREE.Line(this.geometry, this.material);
-  }
-
-  update() {
-    if (this.isDead) return;
-
-    this.lifespan--;
-    if (this.lifespan <= 0) {
-      this.isDead = true;
-      return;
-    }
-
-    const lastPoint = this.points[this.points.length - 1].clone();
-    this.velocity.x += (Math.random() - 0.5) * 0.1;
-    this.velocity.y += (Math.random() - 0.5) * 0.1;
-    this.velocity.z += (Math.random() - 0.5) * 0.1;
-    this.velocity.clampLength(-0.5, 0.5);
-
-    const newPoint = lastPoint.add(this.velocity);
-    this.points.push(newPoint);
-    
-    this.geometry.setFromPoints(this.points);
-    this.geometry.attributes.position.needsUpdate = true;
-    
-    this.material.opacity = this.lifespan / this.maxLife;
-  }
-
-  shouldBranch() {
-    return Math.random() < 0.02 && this.lifespan > this.maxLife * 0.5;
-  }
-  
-  dispose() {
-    this.geometry.dispose();
-    this.material.dispose();
-  }
-}
-
 export default function ParticlesBackground() {
   const mountRef = useRef<HTMLDivElement>(null);
 
@@ -94,26 +33,38 @@ export default function ParticlesBackground() {
       primaryColor = new THREE.Color(0xA020F0);
       accentColor = new THREE.Color(0x1EE0FF);
     }
-    
-    let branches: Branch[] = [];
-    const maxBranches = 100;
 
-    function addBranch(startPoint?: THREE.Vector3, velocity?: THREE.Vector3) {
-      if (branches.length >= maxBranches) return;
+    const cubes: THREE.Mesh[] = [];
+    const cubeCount = 50;
 
-      const sp = startPoint || new THREE.Vector3(0,0,0);
-      const vel = velocity || new THREE.Vector3(
-        (Math.random() - 0.5) * 0.5,
-        (Math.random() - 0.5) * 0.5,
-        (Math.random() - 0.5) * 0.5
-      );
-      const color = Math.random() > 0.5 ? primaryColor : accentColor;
-      
-      const branch = new Branch(sp, vel, color);
-      branches.push(branch);
-      scene.add(branch.line);
+    for (let i = 0; i < cubeCount; i++) {
+        const size = Math.random() * 3 + 1;
+        const geometry = new THREE.BoxGeometry(size, size, size);
+        const material = new THREE.MeshBasicMaterial({
+            color: Math.random() > 0.5 ? primaryColor : accentColor,
+            transparent: true,
+            opacity: Math.random() * 0.5 + 0.2
+        });
+        const cube = new THREE.Mesh(geometry, material);
+
+        cube.position.x = (Math.random() - 0.5) * 100;
+        cube.position.y = (Math.random() - 0.5) * 100;
+        cube.position.z = (Math.random() - 0.5) * 100;
+
+        cube.rotation.x = Math.random() * Math.PI;
+        cube.rotation.y = Math.random() * Math.PI;
+        
+        const velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.05,
+            (Math.random() - 0.5) * 0.05,
+            (Math.random() - 0.5) * 0.05
+        );
+        (cube as any).velocity = velocity;
+
+        cubes.push(cube);
+        scene.add(cube);
     }
-
+    
     const onMouseMove = (event: MouseEvent) => {
       if (currentMount) {
         mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
@@ -127,36 +78,19 @@ export default function ParticlesBackground() {
     const animate = () => {
       frameId = requestAnimationFrame(animate);
 
-      if (Math.random() < 0.1 && branches.length < maxBranches) {
-        addBranch();
-      }
+      cubes.forEach(cube => {
+          cube.rotation.x += (cube as any).velocity.x;
+          cube.rotation.y += (cube as any).velocity.y;
+          
+          cube.position.add((cube as any).velocity);
 
-      const newBranches: Branch[] = [];
-      for (let i = branches.length - 1; i >= 0; i--) {
-        const branch = branches[i];
-        branch.update();
-
-        if (branch.isDead) {
-          scene.remove(branch.line);
-          branch.dispose();
-          branches.splice(i, 1);
-        } else if (branch.shouldBranch()) {
-          const newVel = branch.velocity.clone().multiplyScalar(0.7).applyAxisAngle(new THREE.Vector3(Math.random(),Math.random(),Math.random()).normalize(), (Math.random() - 0.5) * Math.PI * 0.5);
-          newBranches.push(new Branch(branch.points[branch.points.length - 1], newVel, branch.material.color));
-        }
-      }
-
-      newBranches.forEach(b => {
-          if (branches.length < maxBranches) {
-            branches.push(b);
-            scene.add(b.line);
-          } else {
-            b.dispose();
-          }
+          if (cube.position.x > 50 || cube.position.x < -50) (cube as any).velocity.x *= -1;
+          if (cube.position.y > 50 || cube.position.y < -50) (cube as any).velocity.y *= -1;
+          if (cube.position.z > 50 || cube.position.z < -50) (cube as any).velocity.z *= -1;
       });
       
-      camera.position.x += (mouse.x * 10 - camera.position.x) * 0.02;
-      camera.position.y += (-mouse.y * 10 - camera.position.y) * 0.02;
+      camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
+      camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.05;
       camera.lookAt(scene.position);
 
       renderer.render(scene, camera);
@@ -180,12 +114,12 @@ export default function ParticlesBackground() {
       if (currentMount && renderer.domElement) {
         currentMount.removeChild(renderer.domElement);
       }
-      branches.forEach(branch => {
-        scene.remove(branch.line);
-        branch.dispose();
+      cubes.forEach(cube => {
+          scene.remove(cube);
+          cube.geometry.dispose();
+          (cube.material as THREE.Material).dispose();
       });
       scene.clear();
-      branches = [];
     };
   }, []);
 
