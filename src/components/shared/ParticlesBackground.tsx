@@ -2,27 +2,57 @@
 
 import { useEffect, useRef } from 'react';
 
-class Point {
+class Hexagon {
   x: number;
   y: number;
-  vx: number;
-  vy: number;
+  size: number;
+  targetOpacity: number;
+  opacity: number;
 
-  constructor(x: number, y: number) {
+  constructor(x: number, y: number, size: number) {
     this.x = x;
     this.y = y;
-    this.vx = (Math.random() - 0.5) * 0.5;
-    this.vy = (Math.random() - 0.5) * 0.5;
+    this.size = size;
+    this.targetOpacity = 0.1;
+    this.opacity = 0.1;
+  }
+
+  draw(ctx: CanvasRenderingContext2D, color: string) {
+    ctx.save();
+    ctx.globalAlpha = this.opacity;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i;
+      const x_i = this.x + this.size * Math.cos(angle);
+      const y_i = this.y + this.size * Math.sin(angle);
+      if (i === 0) {
+        ctx.moveTo(x_i, y_i);
+      } else {
+        ctx.lineTo(x_i, y_i);
+      }
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  update() {
+    // Smoothly transition to the target opacity
+    this.opacity += (this.targetOpacity - this.opacity) * 0.05;
   }
 }
 
 export default function ParticlesBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mousePos = useRef({ x: -1000, y: -1000 });
 
   useEffect(() => {
     if (!canvasRef.current) return;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let width = canvas.parentElement!.clientWidth;
@@ -30,126 +60,70 @@ export default function ParticlesBackground() {
     canvas.width = width;
     canvas.height = height;
 
-    let primaryColorHsl: string;
-    let accentColorHsl: string;
+    let primaryColor: string;
     try {
       const computedStyle = getComputedStyle(document.documentElement);
-      primaryColorHsl = computedStyle.getPropertyValue('--primary').trim();
-      accentColorHsl = computedStyle.getPropertyValue('--accent').trim();
+      const primaryColorHsl = computedStyle.getPropertyValue('--primary').trim();
+      const [h, s, l] = primaryColorHsl.split(" ").map(s => s.replace('%',''));
+      primaryColor = `hsl(${h}, ${s}%, ${l}%)`;
     } catch(e) {
-      primaryColorHsl = '277 87% 53%';
-      accentColorHsl = '187 100% 56%';
+      primaryColor = `hsl(277, 87%, 53%)`;
     }
-
-    let points: Point[] = [];
-    const numberOfPoints = Math.floor((width * height) / 20000);
-    const mousePoint = new Point(-1000, -1000);
-    mousePoint.vx = 0;
-    mousePoint.vy = 0;
+    
+    let hexagons: Hexagon[] = [];
+    const hexSize = 30;
+    const hexHeight = hexSize * Math.sqrt(3);
+    const hexWidth = hexSize * 2;
+    const vertDist = hexHeight;
+    const horizDist = hexWidth * 3/4;
 
     const init = () => {
-      points = [];
-      for (let i = 0; i < numberOfPoints; i++) {
-        points.push(new Point(Math.random() * width, Math.random() * height));
+      hexagons = [];
+      const rows = Math.ceil(height / vertDist) + 1;
+      const cols = Math.ceil(width / horizDist) + 1;
+
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const x = col * horizDist;
+          const y = row * vertDist + (col % 2 === 1 ? vertDist / 2 : 0);
+          hexagons.push(new Hexagon(x, y, hexSize));
+        }
       }
-      points.push(mousePoint);
     };
 
     const onMouseMove = (event: MouseEvent) => {
       if (canvas) {
         const rect = canvas.getBoundingClientRect();
-        mousePoint.x = event.clientX - rect.left;
-        mousePoint.y = event.clientY - rect.top;
+        mousePos.current = {
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top,
+        };
       }
     };
     window.addEventListener('mousemove', onMouseMove);
 
     const onMouseOut = () => {
-      mousePoint.x = -1000;
-      mousePoint.y = -1000;
+      mousePos.current = { x: -1000, y: -1000 };
     };
-    window.addEventListener('mouseout', onMouseOut);
-    
-    let imageData: ImageData;
-    let data: Uint8ClampedArray;
-
-    const draw = () => {
-        if (!ctx) return;
-        imageData = ctx.getImageData(0, 0, width, height);
-        data = imageData.data;
-        
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                let minDistSq = Infinity;
-                
-                for(let i = 0; i < points.length; i++) {
-                    const p = points[i];
-                    const dx = p.x - x;
-                    const dy = p.y - y;
-                    const distSq = dx * dx + dy * dy;
-                    minDistSq = Math.min(minDistSq, distSq);
-                }
-
-                const index = (y * width + x) * 4;
-                const dist = Math.sqrt(minDistSq);
-                
-                // Draw cell borders
-                if (dist < 2.5) {
-                    const intensity = (2.5 - dist) / 2.5;
-                    const [h, s, l] = primaryColorHsl.split(" ").map(parseFloat);
-                    data[index] = h; // Not used, just placeholder
-                    data[index + 1] = s;
-                    data[index + 2] = l * intensity;
-                } else {
-                    data[index + 3] = 0; // Make other pixels transparent
-                }
-            }
-        }
-
-        // Convert HSL to RGB for display
-        for (let i = 0; i < data.length; i += 4) {
-          if (data[i+3] !== 0) { // only for non-transparent pixels
-            const s = data[i+1] / 100;
-            const l = data[i+2] / 100;
-            const h = parseFloat(primaryColorHsl.split(" ")[0]);
-
-            const c = (1 - Math.abs(2 * l - 1)) * s;
-            const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-            const m = l - c / 2;
-            let r = 0, g = 0, b = 0;
-
-            if (h >= 0 && h < 60) { r = c; g = x; b = 0; }
-            else if (h >= 60 && h < 120) { r = x; g = c; b = 0; }
-            else if (h >= 120 && h < 180) { r = 0; g = c; b = x; }
-            else if (h >= 180 && h < 240) { r = 0; g = x; b = c; }
-            else if (h >= 240 && h < 300) { r = x; g = 0; b = c; }
-            else if (h >= 300 && h < 360) { r = c; g = 0; b = x; }
-            
-            data[i] = (r + m) * 255;
-            data[i + 1] = (g + m) * 255;
-            data[i + 2] = (b + m) * 255;
-            data[i + 3] = 255;
-          }
-        }
-        ctx.putImageData(imageData, 0, 0);
-    }
-
-    const update = () => {
-      for (let i = 0; i < points.length; i++) {
-        if (points[i] === mousePoint) continue;
-        const p = points[i];
-        p.x += p.vx;
-        p.y += p.vy;
-
-        if (p.x < 0 || p.x > width) p.vx *= -1;
-        if (p.y < 0 || p.y > height) p.vy *= -1;
-      }
-    };
+    canvas.addEventListener('mouseout', onMouseOut);
     
     let frameId: number;
     const animate = () => {
-      update();
-      draw();
+        ctx.clearRect(0, 0, width, height);
+
+        hexagons.forEach(hex => {
+            const dx = hex.x - mousePos.current.x;
+            const dy = hex.y - mousePos.current.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            const maxDist = 200;
+            const mappedOpacity = Math.max(0.1, 1 - (dist / maxDist));
+            hex.targetOpacity = mappedOpacity;
+
+            hex.update();
+            hex.draw(ctx, primaryColor);
+        });
+
       frameId = requestAnimationFrame(animate);
     };
 
@@ -171,7 +145,7 @@ export default function ParticlesBackground() {
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseout', onMouseOut);
+      canvas.removeEventListener('mouseout', onMouseOut);
     };
   }, []);
 
