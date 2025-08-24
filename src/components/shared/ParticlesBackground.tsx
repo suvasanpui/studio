@@ -2,127 +2,163 @@
 
 import { useEffect, useRef } from 'react';
 
-class Ball {
+class Particle {
   x: number;
   y: number;
-  r: number;
+  size: number;
   vx: number;
   vy: number;
-  color: string;
-
-  constructor(x: number, y: number, r: number, color: string) {
+  
+  constructor(x: number, y: number, size: number, vx: number, vy: number) {
     this.x = x;
     this.y = y;
-    this.r = r;
-    this.vx = (Math.random() - 0.5) * 2;
-    this.vy = (Math.random() - 0.5) * 2;
-    this.color = color;
+    this.size = size;
+    this.vx = vx;
+    this.vy = vy;
   }
-
-  draw(ctx: CanvasRenderingContext2D) {
+  
+  draw(ctx: CanvasRenderingContext2D, color: string) {
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.fillStyle = this.color;
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+    ctx.fillStyle = color;
     ctx.fill();
   }
+  
+  update(width: number, height: number, mouse: { x: number; y: number, radius: number }) {
+    if (this.x < 0 || this.x > width) {
+      this.vx = -this.vx;
+    }
+    if (this.y < 0 || this.y > height) {
+      this.vy = -this.vy;
+    }
 
-  update(width: number, height: number, mouse: { x: number; y: number }) {
+    // Mouse collision
+    const dx = mouse.x - this.x;
+    const dy = mouse.y - this.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < mouse.radius + this.size) {
+        // Push particle away from mouse
+        this.x -= this.vx * 2;
+        this.y -= this.vy * 2;
+    }
+    
     this.x += this.vx;
     this.y += this.vy;
-
-    if (this.x < this.r || this.x > width - this.r) this.vx *= -1;
-    if (this.y < this.r || this.y > height - this.r) this.vy *= -1;
-
-    // Mouse interaction
-    const dx = this.x - mouse.x;
-    const dy = this.y - mouse.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < 150) {
-      this.x += dx / dist * 0.5;
-      this.y += dy / dist * 0.5;
-    }
   }
 }
 
 export default function ParticlesBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
+  
   useEffect(() => {
     if (!canvasRef.current) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
+    
     let width = canvas.parentElement!.clientWidth;
     let height = canvas.parentElement!.clientHeight;
     canvas.width = width;
     canvas.height = height;
 
     let primaryColorHsl: string;
-    let accentColorHsl: string;
-
     try {
       const computedStyle = getComputedStyle(document.documentElement);
-      primaryColorHsl = `hsl(${computedStyle.getPropertyValue('--primary').trim()})`;
-      accentColorHsl = `hsl(${computedStyle.getPropertyValue('--accent').trim()})`;
+      primaryColorHsl = `hsla(${computedStyle.getPropertyValue('--primary').trim()}, 0.8)`;
     } catch(e) {
-      primaryColorHsl = '#A020F0';
-      accentColorHsl = '#1EE0FF';
+      primaryColorHsl = 'hsla(277, 87%, 53%, 0.8)';
     }
-
-    const balls: Ball[] = [];
-    const numBalls = 20;
-    for (let i = 0; i < numBalls; i++) {
-      balls.push(new Ball(
-        Math.random() * width,
-        Math.random() * height,
-        Math.random() * 30 + 15,
-        Math.random() > 0.5 ? primaryColorHsl : accentColorHsl
-      ));
-    }
-
-    const mouse = { x: -1000, y: -1000 };
-    const onMouseMove = (event: MouseEvent) => {
-      if (canvas) {
-        const rect = canvas.getBoundingClientRect();
-        mouse.x = event.clientX - rect.left;
-        mouse.y = event.clientY - rect.top;
+    
+    let particles: Particle[] = [];
+    const numberOfParticles = (canvas.height * canvas.width) / 9000;
+    
+    const init = () => {
+      particles = [];
+      for (let i = 0; i < numberOfParticles; i++) {
+        const size = Math.random() * 2 + 1;
+        const x = Math.random() * (width - size * 2) + size;
+        const y = Math.random() * (height - size * 2) + size;
+        const vx = (Math.random() - 0.5) * 0.5;
+        const vy = (Math.random() - 0.5) * 0.5;
+        particles.push(new Particle(x, y, size, vx, vy));
       }
     };
-    window.addEventListener('mousemove', onMouseMove);
     
-    let frameId: number;
+    const mouse = {
+      x: -1000,
+      y: -1000,
+      radius: 100
+    };
 
+    const onMouseMove = (event: MouseEvent) => {
+        if (canvas) {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = event.clientX - rect.left;
+            mouse.y = event.clientY - rect.top;
+        }
+    };
+    window.addEventListener('mousemove', onMouseMove);
+
+    const onMouseOut = () => {
+        mouse.x = -1000;
+        mouse.y = -1000;
+    }
+    window.addEventListener('mouseout', onMouseOut)
+
+    const connect = () => {
+        let opacityValue = 1;
+        for (let a = 0; a < particles.length; a++) {
+            for (let b = a; b < particles.length; b++) {
+                const dx = particles[a].x - particles[b].x;
+                const dy = particles[a].y - particles[b].y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const connectDistance = 120;
+
+                if (distance < connectDistance) {
+                    opacityValue = 1 - (distance / connectDistance);
+                    ctx.strokeStyle = primaryColorHsl.replace('0.8', opacityValue.toString());
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(particles[a].x, particles[a].y);
+                    ctx.lineTo(particles[b].x, particles[b].y);
+                    ctx.stroke();
+                }
+            }
+        }
+    };
+
+    let frameId: number;
     const animate = () => {
       frameId = requestAnimationFrame(animate);
       ctx.clearRect(0, 0, width, height);
-      
-      ctx.filter = 'blur(30px) contrast(30)';
-      
-      balls.forEach(ball => {
-        ball.update(width, height, mouse);
-        ball.draw(ctx);
+      particles.forEach(p => {
+        p.update(width, height, mouse);
+        p.draw(ctx, primaryColorHsl);
       });
-      
-      ctx.filter = 'none';
+      connect();
     };
-    animate();
 
     const handleResize = () => {
-      if (!canvas.parentElement) return;
-      width = canvas.parentElement.clientWidth;
-      height = canvas.parentElement.clientHeight;
-      canvas.width = width;
-      canvas.height = height;
+        if (!canvas.parentElement) return;
+        width = canvas.parentElement.clientWidth;
+        height = canvas.parentElement.clientHeight;
+        canvas.width = width;
+        canvas.height = height;
+        init();
     };
-    window.addEventListener('resize', handleResize);
+    
+    init();
+    animate();
 
+    window.addEventListener('resize', handleResize);
+    
     return () => {
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseout', onMouseOut);
     };
   }, []);
-
+  
   return <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full z-0" />;
 }
