@@ -18,7 +18,7 @@ const HeroSection = () => {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 30;
+    camera.position.z = 50;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -26,69 +26,75 @@ const HeroSection = () => {
 
     const mouse = new THREE.Vector2();
 
-    // Create a grid of cubes
-    const cubes: THREE.Mesh[] = [];
-    const gridSize = 20;
-    const spacing = 2;
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const particleCount = 20000;
+    const particles = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+
+    const colorPalette = [
+      new THREE.Color(0xDA70D6), // Orchid
+      new THREE.Color(0x9932CC), // DarkOrchid
+      new THREE.Color(0x4B0082), // Indigo
+      new THREE.Color(0x8A2BE2)  // BlueViolet
+    ];
     
-    for (let i = 0; i < gridSize; i++) {
-        for (let j = 0; j < gridSize; j++) {
-            const material = new THREE.MeshPhongMaterial({ 
-                color: new THREE.Color(`hsl(${Math.random() * 360}, 100%, 75%)`),
-                specular: 0x111111,
-                shininess: 100
-            });
-            const cube = new THREE.Mesh(geometry, material);
-            cube.position.set(
-                (i - gridSize / 2) * spacing,
-                0,
-                (j - gridSize / 2) * spacing,
-            );
-            scene.add(cube);
-            cubes.push(cube);
-        }
+    for (let i = 0; i < particleCount; i++) {
+        const i3 = i * 3;
+        positions[i3] = (Math.random() - 0.5) * 100;
+        positions[i3 + 1] = (Math.random() - 0.5) * 100;
+        positions[i3 + 2] = (Math.random() - 0.5) * 100;
+
+        const color = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+        colors[i3] = color.r;
+        colors[i3 + 1] = color.g;
+        colors[i3 + 2] = color.b;
     }
 
-    // Lighting
-    const light = new THREE.DirectionalLight(0xffffff, 1.5);
-    light.position.set(1, 1, 1);
-    scene.add(light);
-    const ambientLight = new THREE.AmbientLight(0x404040, 2);
-    scene.add(ambientLight);
+    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
+    const particleMaterial = new THREE.PointsMaterial({
+        size: 0.25,
+        vertexColors: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+    });
+
+    const particleSystem = new THREE.Points(particles, particleMaterial);
+    scene.add(particleSystem);
+    
     const onMouseMove = (event: MouseEvent) => {
-      if (currentMount) {
-        mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
-        mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
-      }
+        if (currentMount) {
+            mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
+            mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
+        }
     };
     window.addEventListener('mousemove', onMouseMove);
 
     const clock = new THREE.Clock();
 
     const animate = () => {
-      requestAnimationFrame(animate);
+        requestAnimationFrame(animate);
 
-      const elapsedTime = clock.getElapsedTime();
+        const elapsedTime = clock.getElapsedTime();
+        
+        particleSystem.rotation.y = elapsedTime * 0.05;
 
-      // Animate cubes
-      cubes.forEach(cube => {
-          const dist = cube.position.distanceTo(new THREE.Vector3(mouse.x * 10, 0, mouse.y * 10));
-          const waveX = Math.sin(cube.position.x * 0.5 + elapsedTime);
-          const waveZ = Math.sin(cube.position.z * 0.5 + elapsedTime);
-          const ripple = Math.sin(dist * 0.5 - elapsedTime);
+        // Animate particles
+        const positions = particleSystem.geometry.attributes.position.array as Float32Array;
+        for (let i = 0; i < particleCount; i++) {
+            const i3 = i * 3;
+            const x = positions[i3];
+            positions[i3+1] += Math.sin(elapsedTime + x) * 0.01;
+        }
+        particleSystem.geometry.attributes.position.needsUpdate = true;
 
-          cube.position.y = waveX + waveZ + ripple * 2;
-          cube.rotation.y += 0.01;
-      });
-
-      // Move camera around the scene
-      camera.position.x = Math.sin(elapsedTime * 0.2) * 20;
-      camera.position.z = Math.cos(elapsedTime * 0.2) * 30;
-      camera.lookAt(scene.position);
+        // Camera interaction
+        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
+        camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.05;
+        camera.lookAt(scene.position);
       
-      renderer.render(scene, camera);
+        renderer.render(scene, camera);
     };
     animate();
 
@@ -100,15 +106,15 @@ const HeroSection = () => {
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
     };
-    handleResize();
     window.addEventListener('resize', handleResize);
+    handleResize();
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mousemove', onMouseMove);
-      if (currentMount && renderer.domElement) {
-        currentMount.removeChild(renderer.domElement);
-      }
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('mousemove', onMouseMove);
+        if (currentMount && renderer.domElement) {
+            currentMount.removeChild(renderer.domElement);
+        }
     };
   }, []);
 
