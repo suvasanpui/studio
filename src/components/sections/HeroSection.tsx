@@ -15,65 +15,109 @@ const HeroSection = () => {
     if (!mountRef.current) return;
 
     const currentMount = mountRef.current;
-
+    
+    // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 50;
+    camera.position.z = 250;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
     
-    const cubes: (THREE.Mesh & { rotationSpeed?: { x: number; y: number } })[] = [];
-    const cubeCount = 150;
-    const geometry = new THREE.BoxGeometry(2, 2, 2);
+    // Particle setup
+    const particleCount = 200;
+    const particles = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const velocities = new Float32Array(particleCount * 3);
 
-    const colors = [new THREE.Color(0xa020f0), new THREE.Color(0x1ee0ff)]; // Purple and Neon Blue
-
-    for (let i = 0; i < cubeCount; i++) {
-      const material = new THREE.MeshBasicMaterial({ color: colors[Math.floor(Math.random() * colors.length)] });
-      const cube = new THREE.Mesh(geometry, material) as THREE.Mesh & { rotationSpeed?: { x: number; y: number } };
-
-      cube.position.x = (Math.random() - 0.5) * 100;
-      cube.position.y = (Math.random() - 0.5) * 100;
-      cube.position.z = (Math.random() - 0.5) * 100;
-
-      cube.rotation.x = Math.random() * Math.PI;
-      cube.rotation.y = Math.random() * Math.PI;
-
-      const scale = Math.random() * 0.5 + 0.5;
-      cube.scale.set(scale, scale, scale);
-      
-      cube.rotationSpeed = {
-        x: Math.random() * 0.01,
-        y: Math.random() * 0.01,
-      };
-
-      cubes.push(cube);
-      scene.add(cube);
+    for (let i = 0; i < particleCount * 3; i++) {
+        positions[i] = (Math.random() - 0.5) * 500;
+        velocities[i] = (Math.random() - 0.5) * 0.5;
     }
     
+    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const particleMaterial = new THREE.PointsMaterial({
+        color: 0x1ee0ff, // Neon Blue
+        size: 2,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        sizeAttenuation: true,
+    });
+    
+    const particleSystem = new THREE.Points(particles, particleMaterial);
+    scene.add(particleSystem);
+    
+    // Line setup
+    const lineMaterial = new THREE.LineBasicMaterial({
+        color: 0xa020f0, // Purple
+        linewidth: 1,
+        transparent: true,
+        opacity: 0,
+    });
+    
+    const lineGeometry = new THREE.BufferGeometry();
+    const linePositions = new Float32Array(particleCount * particleCount * 3);
+    lineGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+    const lines = new THREE.LineSegments(lineGeometry, lineMaterial);
+    scene.add(lines);
+
     const onMouseMove = (event: MouseEvent) => {
-        mouse.current.x = (event.clientX / window.innerWidth) - 0.5;
-        mouse.current.y = (event.clientY / window.innerHeight) - 0.5;
+        if (currentMount) {
+            mouse.current.x = event.clientX - currentMount.clientWidth / 2;
+            mouse.current.y = event.clientY - currentMount.clientHeight / 2;
+        }
     }
     window.addEventListener('mousemove', onMouseMove);
 
-    const clock = new THREE.Clock();
-
     const animate = () => {
       requestAnimationFrame(animate);
+
+      const posAttribute = particles.getAttribute('position') as THREE.BufferAttribute;
+      const linePosAttribute = lineGeometry.getAttribute('position') as THREE.BufferAttribute;
+      let vertexCount = 0;
+
+      for (let i = 0; i < particleCount; i++) {
+        const i3 = i * 3;
+        posAttribute.array[i3] += velocities[i3];
+        posAttribute.array[i3 + 1] += velocities[i3 + 1];
+
+        // Bounce off walls
+        if (posAttribute.array[i3] > 250 || posAttribute.array[i3] < -250) velocities[i3] *= -1;
+        if (posAttribute.array[i3+1] > 250 || posAttribute.array[i3+1] < -250) velocities[i3+1] *= -1;
+
+        // Check distance to other particles
+        for(let j = i + 1; j < particleCount; j++){
+            const j3 = j * 3;
+            const dx = posAttribute.array[i3] - posAttribute.array[j3];
+            const dy = posAttribute.array[i3+1] - posAttribute.array[j3+1];
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if(dist < 50) {
+                linePosAttribute.array[vertexCount * 3] = posAttribute.array[i3];
+                linePosAttribute.array[vertexCount * 3 + 1] = posAttribute.array[i3 + 1];
+                linePosAttribute.array[vertexCount * 3 + 2] = posAttribute.array[i3 + 2];
+                vertexCount++;
+                linePosAttribute.array[vertexCount * 3] = posAttribute.array[j3];
+                linePosAttribute.array[vertexCount * 3 + 1] = posAttribute.array[j3 + 1];
+                linePosAttribute.array[vertexCount * 3 + 2] = posAttribute.array[j3 + 2];
+                vertexCount++;
+            }
+        }
+      }
       
-      cubes.forEach(cube => {
-          if(cube.rotationSpeed) {
-            cube.rotation.x += cube.rotationSpeed.x;
-            cube.rotation.y += cube.rotationSpeed.y;
-          }
-      });
-      
-      camera.position.x += (mouse.current.x * 20 - camera.position.x) * 0.05;
-      camera.position.y += (-mouse.current.y * 20 - camera.position.y) * 0.05;
+      linePosAttribute.needsUpdate = true;
+      posAttribute.needsUpdate = true;
+      lineGeometry.setDrawRange(0, vertexCount);
+
+      // Animate line opacity based on distance from center
+      const distanceToCenter = Math.sqrt(camera.position.x * camera.position.x + camera.position.y * camera.position.y);
+      lines.material.opacity = Math.max(0, 1 - distanceToCenter / 400);
+
+      // Mouse interaction
+      camera.position.x += (mouse.current.x * 0.2 - camera.position.x) * 0.02;
+      camera.position.y += (-mouse.current.y * 0.2 - camera.position.y) * 0.02;
       camera.lookAt(scene.position);
 
       renderer.render(scene, camera);
