@@ -17,93 +17,78 @@ const HeroSection = () => {
 
     // Scene setup
     const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
-    camera.position.z = 1;
+    const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
+    camera.position.z = 0;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
 
     const clock = new THREE.Clock();
+    const mouse = new THREE.Vector2();
 
-    // Metaballs shader
-    const vertexShader = `
-      void main() {
-        gl_Position = vec4(position, 1.0);
-      }
-    `;
+    const starCount = 5000;
+    const particles = new Float32Array(starCount * 3);
+    const colors = new Float32Array(starCount * 3);
+    const starGeometry = new THREE.BufferGeometry();
+    const color = new THREE.Color();
 
-    const fragmentShader = `
-      uniform vec3 color1;
-      uniform vec3 color2;
-      uniform float time;
-      uniform vec2 resolution;
-      uniform vec2 mouse;
-      
-      const int NUM_METABALLS = 5;
-      vec3 metaballs[NUM_METABALLS];
-
-      float sdCircle(vec2 p, float r) {
-        return length(p) - r;
-      }
-      
-      void main() {
-        vec2 uv = (gl_FragCoord.xy * 2.0 - resolution.xy) / resolution.y;
+    for (let i = 0; i < starCount; i++) {
+        const i3 = i * 3;
+        particles[i3] = (Math.random() - 0.5) * 10; // x
+        particles[i3 + 1] = (Math.random() - 0.5) * 10; // y
+        particles[i3 + 2] = (Math.random() - 1) * 50; // z
         
-        // Define metaballs
-        metaballs[0] = vec3(sin(time * 0.5) * 0.5, cos(time * 0.3) * 0.5, 0.2);
-        metaballs[1] = vec3(sin(time * 0.7) * 0.6, cos(time * 0.5) * 0.6, 0.25);
-        metaballs[2] = vec3(sin(time * 0.9) * 0.7, cos(time * 0.7) * 0.7, 0.15);
-        metaballs[3] = vec3(sin(time * 1.1) * 0.4, cos(time * 0.9) * 0.4, 0.2);
-        metaballs[4] = vec3(mouse.x * 2.0, mouse.y * 2.0, 0.3); // Mouse controlled
+        color.setHSL(Math.random(), 0.7, 0.8);
+        colors[i3] = color.r;
+        colors[i3 + 1] = color.g;
+        colors[i3 + 2] = color.b;
+    }
+    
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(particles, 3));
+    starGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-        float sum = 0.0;
-        for (int i = 0; i < NUM_METABALLS; i++) {
-            sum += metaballs[i].z / length(uv - metaballs[i].xy);
-        }
-        
-        float threshold = 1.0;
-        float value = smoothstep(threshold - 0.05, threshold + 0.05, sum);
-        
-        if (value < 0.1) {
-          discard;
-        }
-
-        vec3 finalColor = mix(color1, color2, length(uv));
-        gl_FragColor = vec4(finalColor, value);
-      }
-    `;
-
-    const uniforms = {
-        time: { value: 0.0 },
-        resolution: { value: new THREE.Vector2(currentMount.clientWidth, currentMount.clientHeight) },
-        mouse: { value: new THREE.Vector2(0.5, 0.5) },
-        color1: { value: new THREE.Color(0x6a0dad) }, // Purple
-        color2: { value: new THREE.Color(0x00ffff) }, // Cyan
-    };
-
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    const material = new THREE.ShaderMaterial({
-        vertexShader,
-        fragmentShader,
-        uniforms,
+    const starMaterial = new THREE.PointsMaterial({
+        size: 0.05,
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
         transparent: true,
+        depthWrite: false,
     });
 
-    const plane = new THREE.Mesh(geometry, material);
-    scene.add(plane);
+    const starField = new THREE.Points(starGeometry, starMaterial);
+    scene.add(starField);
 
     const onMouseMove = (event: MouseEvent) => {
         if (currentMount) {
-            uniforms.mouse.value.x = (event.clientX / currentMount.clientWidth) - 0.5;
-            uniforms.mouse.value.y = -( (event.clientY / currentMount.clientHeight) - 0.5);
+            mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
+            mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
         }
     };
     window.addEventListener('mousemove', onMouseMove);
 
     const animate = () => {
         requestAnimationFrame(animate);
-        uniforms.time.value = clock.getElapsedTime();
+        const elapsedTime = clock.getElapsedTime();
+
+        const positions = starGeometry.attributes.position.array as Float32Array;
+
+        for (let i = 0; i < starCount; i++) {
+            const i3 = i * 3;
+            positions[i3 + 2] += 0.2; // Move star forward
+
+            if (positions[i3 + 2] > camera.position.z) {
+                positions[i3 + 2] = -50; // Reset star to the back
+            }
+        }
+        
+        starGeometry.attributes.position.needsUpdate = true;
+
+        // Make camera follow mouse
+        camera.position.x += (mouse.x * 2 - camera.position.x) * 0.02;
+        camera.position.y += (mouse.y * 2 - camera.position.y) * 0.02;
+        camera.lookAt(scene.position);
+        
         renderer.render(scene, camera);
     };
     animate();
@@ -112,23 +97,10 @@ const HeroSection = () => {
         const width = currentMount.clientWidth;
         const height = currentMount.clientHeight;
         renderer.setSize(width, height);
-        uniforms.resolution.value.set(width, height);
-        // Adjust camera for non-square aspect ratios if needed
-        const aspect = width / height;
-        if (aspect > 1) {
-            camera.left = -aspect;
-            camera.right = aspect;
-            camera.top = 1;
-            camera.bottom = -1;
-        } else {
-            camera.left = -1;
-            camera.right = 1;
-            camera.top = 1 / aspect;
-            camera.bottom = -1 / aspect;
-        }
+        camera.aspect = width / height;
         camera.updateProjectionMatrix();
     };
-    handleResize(); // Initial call
+    handleResize();
     window.addEventListener('resize', handleResize);
 
     return () => {
