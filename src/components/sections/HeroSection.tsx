@@ -18,7 +18,7 @@ const HeroSection = () => {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 10;
+    camera.position.z = 30;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -26,88 +26,37 @@ const HeroSection = () => {
 
     const mouse = new THREE.Vector2();
 
-    // Create code texture
-    const createCodeTexture = (code: string) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 256;
-      const context = canvas.getContext('2d');
-      if (!context) return new THREE.CanvasTexture(canvas);
-
-      context.fillStyle = 'rgba(10, 20, 40, 0.7)';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      
-      context.font = "20px 'Space Mono', monospace";
-      context.fillStyle = '#88ddff';
-      context.shadowColor = '#00f';
-      context.shadowBlur = 10;
-
-      const lines = code.split('\n');
-      lines.forEach((line, i) => {
-        context.fillText(line, 15, 30 + i * 25);
-      });
-
-      return new THREE.CanvasTexture(canvas);
-    };
-
-    const codeSnippets = [
-`function factorial(n) {
-  if (n === 0) {
-    return 1;
-  }
-  return n * factorial(n - 1);
-}`,
-`const bubbleSort = (arr) => {
-  let swapped;
-  do {
-    swapped = false;
-    for (let i = 0; i < arr.length; i++) {
-       // ...
-    }
-  } while (swapped);
-}`,
-`class Node {
-  constructor(data) {
-    this.data = data;
-    this.next = null;
-  }
-}`,
-`const promise = new Promise((resolve, reject) => {
-  setTimeout(() => {
-    resolve('Success!');
-  }, 1000);
-});`
-    ];
-
-    const codeBlocks: THREE.Mesh[] = [];
-    const planeGeometry = new THREE.PlaneGeometry(8, 4);
-
-    for (let i = 0; i < 20; i++) {
-      const codeTexture = createCodeTexture(codeSnippets[i % codeSnippets.length]);
-      const planeMaterial = new THREE.MeshBasicMaterial({ 
-        map: codeTexture, 
-        transparent: true,
-        opacity: 0.8,
-        side: THREE.DoubleSide
-      });
-      const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-      
-      plane.position.set(
-        (Math.random() - 0.5) * 50,
-        (Math.random() - 0.5) * 30,
-        (Math.random() - 0.5) * 40 - 20
-      );
-
-      plane.rotation.set(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
-        Math.random() * Math.PI
-      );
-      
-      scene.add(plane);
-      codeBlocks.push(plane);
-    }
+    // Create a grid of cubes
+    const cubes: THREE.Mesh[] = [];
+    const gridSize = 20;
+    const spacing = 2;
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
     
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+            const material = new THREE.MeshPhongMaterial({ 
+                color: new THREE.Color(`hsl(${Math.random() * 360}, 100%, 75%)`),
+                specular: 0x111111,
+                shininess: 100
+            });
+            const cube = new THREE.Mesh(geometry, material);
+            cube.position.set(
+                (i - gridSize / 2) * spacing,
+                0,
+                (j - gridSize / 2) * spacing,
+            );
+            scene.add(cube);
+            cubes.push(cube);
+        }
+    }
+
+    // Lighting
+    const light = new THREE.DirectionalLight(0xffffff, 1.5);
+    light.position.set(1, 1, 1);
+    scene.add(light);
+    const ambientLight = new THREE.AmbientLight(0x404040, 2);
+    scene.add(ambientLight);
+
     const onMouseMove = (event: MouseEvent) => {
       if (currentMount) {
         mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
@@ -123,14 +72,20 @@ const HeroSection = () => {
 
       const elapsedTime = clock.getElapsedTime();
 
-      codeBlocks.forEach(block => {
-        block.rotation.x += 0.001;
-        block.rotation.y += 0.002;
+      // Animate cubes
+      cubes.forEach(cube => {
+          const dist = cube.position.distanceTo(new THREE.Vector3(mouse.x * 10, 0, mouse.y * 10));
+          const waveX = Math.sin(cube.position.x * 0.5 + elapsedTime);
+          const waveZ = Math.sin(cube.position.z * 0.5 + elapsedTime);
+          const ripple = Math.sin(dist * 0.5 - elapsedTime);
+
+          cube.position.y = waveX + waveZ + ripple * 2;
+          cube.rotation.y += 0.01;
       });
 
-      // Make camera follow mouse
-      camera.position.x += (mouse.x * 2 - camera.position.x) * 0.02;
-      camera.position.y += (mouse.y * 2 - camera.position.y) * 0.02;
+      // Move camera around the scene
+      camera.position.x = Math.sin(elapsedTime * 0.2) * 20;
+      camera.position.z = Math.cos(elapsedTime * 0.2) * 30;
       camera.lookAt(scene.position);
       
       renderer.render(scene, camera);
