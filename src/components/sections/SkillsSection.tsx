@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
+import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry.js';
 import { motion } from 'framer-motion';
 import AnimatedSection from '../shared/AnimatedSection';
 import { Card, CardContent } from '@/components/ui/card';
@@ -34,85 +36,100 @@ export default function SkillsSection() {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 50;
+    camera.position.z = 75;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
 
-    const mouse = new THREE.Vector2();
-
-    const particleCount = 20000;
-    const particles = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-
-    const colorPalette = [
-      new THREE.Color(0xDA70D6), // Orchid
-      new THREE.Color(0x9932CC), // DarkOrchid
-      new THREE.Color(0x4B0082), // Indigo
-      new THREE.Color(0x8A2BE2)  // BlueViolet
-    ];
+    const loader = new FontLoader();
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     
-    for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3;
-        positions[i3] = (Math.random() - 0.5) * 100;
-        positions[i3 + 1] = (Math.random() - 0.5) * 100;
-        positions[i3 + 2] = (Math.random() - 0.5) * 100;
+    const streams: { x: number, y: number, speed: number, text: THREE.Mesh, chars: THREE.Mesh[] }[] = [];
+    const streamCount = 200;
+    const streamLength = 20;
 
-        const color = colorPalette[Math.floor(Math.random() * colorPalette.length)];
-        colors[i3] = color.r;
-        colors[i3 + 1] = color.g;
-        colors[i3 + 2] = color.b;
-    }
+    let font: import('three').Font;
 
-    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    const particleMaterial = new THREE.PointsMaterial({
-        size: 0.25,
-        vertexColors: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
+    loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (loadedFont) => {
+        font = loadedFont;
+        initStreams();
     });
 
-    const particleSystem = new THREE.Points(particles, particleMaterial);
-    scene.add(particleSystem);
+    function createChar(char: string) {
+        const geometry = new TextGeometry(char, {
+            font: font,
+            size: 1.5,
+            height: 0.1,
+        });
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 1 });
+        return new THREE.Mesh(geometry, material);
+    }
     
-    const onMouseMove = (event: MouseEvent) => {
-        if (currentMount) {
-            mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
-            mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
+    function initStreams() {
+        for (let i = 0; i < streamCount; i++) {
+            const x = (Math.random() - 0.5) * 200;
+            const y = Math.random() * 200 + 100;
+            const speed = Math.random() * 0.4 + 0.1;
+            
+            const charMeshes: THREE.Mesh[] = [];
+            for (let j = 0; j < streamLength; j++) {
+                const char = chars[Math.floor(Math.random() * chars.length)];
+                const mesh = createChar(char);
+                mesh.position.set(x, y - j * 2.5, 0);
+                
+                const material = mesh.material as THREE.MeshBasicMaterial;
+                if (j === 0) {
+                    material.color.set(0xffffff); // Head character is white
+                    material.opacity = 1;
+                } else {
+                    material.opacity = 1 - j / streamLength;
+                }
+                
+                scene.add(mesh);
+                charMeshes.push(mesh);
+            }
+            streams.push({ x, y, speed, text: charMeshes[0], chars: charMeshes });
         }
-    };
-    window.addEventListener('mousemove', onMouseMove);
+    }
 
-    const clock = new THREE.Clock();
 
     const animate = () => {
         requestAnimationFrame(animate);
 
-        const elapsedTime = clock.getElapsedTime();
-        
-        particleSystem.rotation.y = elapsedTime * 0.05;
+        streams.forEach(stream => {
+            stream.y -= stream.speed;
+            if (stream.y < -100) {
+                stream.y = Math.random() * 200 + 100;
+                stream.x = (Math.random() - 0.5) * 200;
+            }
 
-        // Animate particles
-        const positions = particleSystem.geometry.attributes.position.array as Float32Array;
-        for (let i = 0; i < particleCount; i++) {
-            const i3 = i * 3;
-            const x = positions[i3];
-            positions[i3+1] += Math.sin(elapsedTime + x) * 0.01;
-        }
-        particleSystem.geometry.attributes.position.needsUpdate = true;
-
-        // Camera interaction
-        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
-        camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.05;
-        camera.lookAt(scene.position);
+            stream.chars.forEach((charMesh, index) => {
+                charMesh.position.y = stream.y - index * 2.5;
+                charMesh.position.x = stream.x;
+                
+                // Randomly change character
+                if (Math.random() > 0.99) {
+                    const newChar = chars[Math.floor(Math.random() * chars.length)];
+                    (charMesh.geometry as TextGeometry).dispose();
+                    charMesh.geometry = new TextGeometry(newChar, { font: font, size: 1.5, height: 0.1 });
+                }
+            });
+        });
       
         renderer.render(scene, camera);
     };
-    animate();
+    
+    let animationFrameId: number;
+    const startAnimation = () => {
+      if (!font) {
+        animationFrameId = requestAnimationFrame(startAnimation);
+      } else {
+        animate();
+      }
+    }
+    startAnimation();
+
 
     const handleResize = () => {
         if (!currentMount) return;
@@ -127,10 +144,22 @@ export default function SkillsSection() {
 
     return () => {
         window.removeEventListener('resize', handleResize);
-        window.removeEventListener('mousemove', onMouseMove);
         if (currentMount && renderer.domElement) {
             currentMount.removeChild(renderer.domElement);
         }
+        cancelAnimationFrame(animationFrameId);
+        // Dispose of Three.js objects
+        streams.forEach(stream => {
+            stream.chars.forEach(charMesh => {
+                scene.remove(charMesh);
+                charMesh.geometry.dispose();
+                if (Array.isArray(charMesh.material)) {
+                    charMesh.material.forEach(m => m.dispose());
+                } else {
+                    charMesh.material.dispose();
+                }
+            });
+        });
     };
   }, []);
 
@@ -159,7 +188,7 @@ export default function SkillsSection() {
                   transition={{ duration: 0.5 }}
                 >
                   <div className={cn('w-5/12', { 'order-last': !isLeft })}>
-                    <Card className="group relative overflow-hidden border-2 border-border bg-background/80 shadow-lg transition-all duration-300 hover:border-primary hover:-translate-y-1 hover:shadow-primary/20 backdrop-blur-sm">
+                    <Card className="group relative overflow-hidden border-2 border-border bg-background/90 shadow-lg transition-all duration-300 hover:border-primary hover:-translate-y-1 hover:shadow-primary/20 backdrop-blur-sm">
                       <CardContent className="flex items-center gap-4 p-4">
                         <div className="text-primary transition-transform duration-300 group-hover:scale-110">
                           {React.cloneElement(skill.icon, { className: 'h-8 w-8' })}
