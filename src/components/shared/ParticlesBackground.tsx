@@ -21,11 +21,7 @@ export default function ParticlesBackground() {
     currentMount.appendChild(renderer.domElement);
 
     const mouse = new THREE.Vector2(10000, 10000);
-
-    const particleCount = 5000;
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-
+    
     let primaryColor: THREE.Color;
     let accentColor: THREE.Color;
     try {
@@ -37,39 +33,49 @@ export default function ParticlesBackground() {
       accentColor = new THREE.Color(0x00BFFF);
     }
     
-    for (let i = 0; i < particleCount; i++) {
+    const lines: THREE.Line[] = [];
+    const lineCount = 150;
+    const pointsPerLine = 100;
+
+    for (let j = 0; j < lineCount; j++) {
+      const positions = new Float32Array(pointsPerLine * 3);
+      const colors = new Float32Array(pointsPerLine * 3);
+      const geometry = new THREE.BufferGeometry();
+      
+      const line_width = Math.random() * 0.5 + 0.1;
+
+      for (let i = 0; i < pointsPerLine; i++) {
         const i3 = i * 3;
+        positions[i3] = (i / (pointsPerLine - 1)) * 200 - 100; // x from -100 to 100
+        positions[i3 + 1] = 0; // y initially 0
+        positions[i3 + 2] = (Math.random() - 0.5) * 100; // z depth
         
-        const angle = Math.random() * Math.PI * 2;
-        const radius = Math.random() * 20 + 5;
-
-        positions[i3] = Math.cos(angle) * radius;
-        positions[i3 + 1] = Math.sin(angle) * radius;
-        positions[i3 + 2] = (Math.random() - 0.5) * 200;
-        
-        const mixedColor = primaryColor.clone();
-        const distanceFromCenter = Math.sqrt(positions[i3]**2 + positions[i3+1]**2) / 25;
-        mixedColor.lerp(accentColor, distanceFromCenter);
-
+        const mixedColor = primaryColor.clone().lerp(accentColor, i / pointsPerLine);
         colors[i3] = mixedColor.r;
         colors[i3 + 1] = mixedColor.g;
         colors[i3 + 2] = mixedColor.b;
+      }
+      
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      
+      const material = new THREE.LineBasicMaterial({
+        linewidth: line_width,
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        opacity: 0.35 + Math.random() * 0.3
+      });
+
+      const line = new THREE.Line(geometry, material);
+      line.userData.originalZ = (Math.random() - 0.5) * 200;
+      line.position.z = line.userData.originalZ;
+      line.userData.speed = Math.random() * 0.5 + 0.1;
+      
+      scene.add(line);
+      lines.push(line);
     }
 
-    const particlesGeometry = new THREE.BufferGeometry();
-    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    const particlesMaterial = new THREE.PointsMaterial({
-        size: 0.2,
-        sizeAttenuation: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        vertexColors: true,
-    });
-    
-    const particles = new THREE.Points(particlesGeometry, particlesMaterial);
-    scene.add(particles);
 
     const onMouseMove = (event: MouseEvent) => {
         if (currentMount) {
@@ -90,13 +96,24 @@ export default function ParticlesBackground() {
     const animate = () => {
         const elapsedTime = clock.getElapsedTime();
         
-        particles.position.z += 0.2;
-        if(particles.position.z > 100) {
-            particles.position.z = -100;
-        }
+        lines.forEach((line, lineIndex) => {
+          const positions = line.geometry.attributes.position as THREE.BufferAttribute;
+          
+          for(let i=0; i<pointsPerLine; i++){
+            const y = Math.sin(i * 0.1 + elapsedTime * 2 + lineIndex * 0.3) * 15;
+            positions.setY(i, y);
+          }
+          positions.needsUpdate = true;
 
-        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.02;
-        camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.02;
+          line.position.z += line.userData.speed;
+          if(line.position.z > 200) {
+            line.position.z = -200;
+          }
+
+        });
+        
+        camera.position.x += (mouse.x * 20 - camera.position.x) * 0.02;
+        camera.position.y += (-mouse.y * 20 - camera.position.y) * 0.02;
         camera.lookAt(scene.position);
       
         renderer.render(scene, camera);
@@ -124,8 +141,14 @@ export default function ParticlesBackground() {
                 currentMount.removeChild(renderer.domElement);
             }
         }
-        particlesGeometry.dispose();
-        particlesMaterial.dispose();
+        lines.forEach(line => {
+          line.geometry.dispose();
+          if (Array.isArray(line.material)) {
+             line.material.forEach(m => m.dispose());
+          } else {
+            line.material.dispose();
+          }
+        });
     };
   }, []);
 
