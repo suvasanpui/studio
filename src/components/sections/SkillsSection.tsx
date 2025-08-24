@@ -34,49 +34,54 @@ export default function SkillsSection() {
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 50;
+    camera.position.z = 120;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
 
-    const mouse = new THREE.Vector2();
+    const mouse = new THREE.Vector2(10000, 10000);
 
-    const cubes: THREE.Mesh[] = [];
-    const cubeCount = 100;
-    const cubeMaterials = [
-        new THREE.MeshBasicMaterial({ color: 0x9932CC, transparent: true, opacity: 0.8 }),
-        new THREE.MeshBasicMaterial({ color: 0x8A2BE2, transparent: true, opacity: 0.8 }),
-        new THREE.MeshBasicMaterial({ color: 0xDA70D6, transparent: true, opacity: 0.8 }),
-    ];
+    const particleCount = 150;
+    const particles = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const velocities: THREE.Vector3[] = [];
 
-    for (let i = 0; i < cubeCount; i++) {
-        const geometry = new THREE.BoxGeometry(
-            Math.random() * 3 + 1,
-            Math.random() * 3 + 1,
-            Math.random() * 3 + 1
-        );
-        const material = cubeMaterials[Math.floor(Math.random() * cubeMaterials.length)];
-        const cube = new THREE.Mesh(geometry, material);
-        cube.position.set(
-            (Math.random() - 0.5) * 150,
-            (Math.random() - 0.5) * 150,
-            (Math.random() - 0.5) * 150
-        );
-        cube.rotation.set(
-            Math.random() * Math.PI * 2,
-            Math.random() * Math.PI * 2,
-            Math.random() * Math.PI * 2
-        );
-        (cube as any).rotationSpeed = new THREE.Vector3(
-            (Math.random() - 0.5) * 0.01,
-            (Math.random() - 0.5) * 0.01,
-            (Math.random() - 0.5) * 0.01
-        );
-        scene.add(cube);
-        cubes.push(cube);
+    const color = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--primary'));
+
+    for (let i = 0; i < particleCount; i++) {
+        const i3 = i * 3;
+        positions[i3] = (Math.random() - 0.5) * 300;
+        positions[i3 + 1] = (Math.random() - 0.5) * 300;
+        positions[i3 + 2] = (Math.random() - 0.5) * 300;
+        velocities.push(new THREE.Vector3((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, 0));
     }
+
+    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const particleMaterial = new THREE.PointsMaterial({
+        color: new THREE.Color(color.getHex()),
+        size: 3,
+        transparent: true,
+        opacity: 0.7,
+        depthWrite: false,
+    });
+
+    const particleSystem = new THREE.Points(particles, particleMaterial);
+    scene.add(particleSystem);
     
+    const linesGeometry = new THREE.BufferGeometry();
+    const linePositions = new Float32Array(particleCount * particleCount * 6);
+    linesGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+    const lineMaterial = new THREE.LineBasicMaterial({
+        color: new THREE.Color(color.getHex()),
+        transparent: true,
+        opacity: 0.1,
+        depthWrite: false,
+    });
+    const linesMesh = new THREE.LineSegments(linesGeometry, lineMaterial);
+    scene.add(linesMesh);
+
     const onMouseMove = (event: MouseEvent) => {
         if (currentMount) {
             mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
@@ -84,24 +89,58 @@ export default function SkillsSection() {
         }
     };
     window.addEventListener('mousemove', onMouseMove);
+    
+    const onMouseLeave = () => {
+        mouse.x = 10000;
+        mouse.y = 10000;
+    }
+    currentMount.addEventListener('mouseleave', onMouseLeave);
 
     const animate = () => {
         requestAnimationFrame(animate);
 
-        cubes.forEach(cube => {
-            cube.rotation.x += (cube as any).rotationSpeed.x;
-            cube.rotation.y += (cube as any).rotationSpeed.y;
-            cube.rotation.z += (cube as any).rotationSpeed.z;
-        });
+        const positions = particleSystem.geometry.attributes.position.array as Float32Array;
+        const linePositions = linesMesh.geometry.attributes.position.array as Float32Array;
 
-        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
-        camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.05;
+        for (let i = 0; i < particleCount; i++) {
+            const i3 = i * 3;
+            positions[i3] += velocities[i].x;
+            positions[i3 + 1] += velocities[i].y;
+
+            if (positions[i3+1] > 150 || positions[i3+1] < -150) velocities[i].y *= -1;
+            if (positions[i3] > 150 || positions[i3] < -150) velocities[i].x *= -1;
+        }
+
+        let lineIndex = 0;
+        for (let i = 0; i < particleCount; i++) {
+            for (let j = i + 1; j < particleCount; j++) {
+                const i3 = i * 3;
+                const j3 = j * 3;
+                const dx = positions[i3] - positions[j3];
+                const dy = positions[i3+1] - positions[j3+1];
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 50) {
+                    linePositions[lineIndex++] = positions[i3];
+                    linePositions[lineIndex++] = positions[i3+1];
+                    linePositions[lineIndex++] = positions[i3+2];
+                    linePositions[lineIndex++] = positions[j3];
+                    linePositions[lineIndex++] = positions[j3+1];
+                    linePositions[lineIndex++] = positions[j3+2];
+                }
+            }
+        }
+        linesMesh.geometry.attributes.position.needsUpdate = true;
+        (linesMesh.geometry as THREE.BufferGeometry).setDrawRange(0, lineIndex / 3);
+
+        particleSystem.geometry.attributes.position.needsUpdate = true;
+
+        camera.position.x += (mouse.x * 20 - camera.position.x) * 0.02;
+        camera.position.y += (-mouse.y * 20 - camera.position.y) * 0.02;
         camera.lookAt(scene.position);
       
         renderer.render(scene, camera);
     };
     animate();
-
 
     const handleResize = () => {
         if (!currentMount) return;
@@ -117,16 +156,22 @@ export default function SkillsSection() {
     return () => {
         window.removeEventListener('resize', handleResize);
         window.removeEventListener('mousemove', onMouseMove);
-        if (currentMount && renderer.domElement) {
-            currentMount.removeChild(renderer.domElement);
+        if (currentMount) {
+            currentMount.removeEventListener('mouseleave', onMouseLeave);
+            if (renderer.domElement) {
+                currentMount.removeChild(renderer.domElement);
+            }
         }
-        cubes.forEach(cube => {
-            scene.remove(cube);
-            cube.geometry.dispose();
-            if (Array.isArray(cube.material)) {
-                cube.material.forEach(m => m.dispose());
-            } else {
-                cube.material.dispose();
+        scene.traverse(object => {
+            if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {
+                if (object.geometry) {
+                    object.geometry.dispose();
+                }
+                if (Array.isArray(object.material)) {
+                    object.material.forEach(m => m.dispose());
+                } else {
+                    object.material.dispose();
+                }
             }
         });
     };
