@@ -22,68 +22,59 @@ export default function ParticlesBackground() {
 
     const mouse = new THREE.Vector2(10000, 10000);
 
-    const shapes: THREE.Mesh[] = [];
-    const shapeCount = 50;
-    
-    let color: THREE.Color;
+    const particleCount = 20000;
+    const positions = new Float32Array(particleCount * 3);
+    const colors = new Float32Array(particleCount * 3);
+
+    let primaryColor: THREE.Color;
+    let accentColor: THREE.Color;
     try {
-        color = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--primary'));
+      const computedStyle = getComputedStyle(document.documentElement);
+      primaryColor = new THREE.Color(computedStyle.getPropertyValue('--primary').trim());
+      accentColor = new THREE.Color(computedStyle.getPropertyValue('--accent').trim());
     } catch(e) {
-        color = new THREE.Color(0xA020F0);
+      primaryColor = new THREE.Color(0x7000FF);
+      accentColor = new THREE.Color(0x00BFFF);
     }
     
-    const geometries = [
-        new THREE.BoxGeometry(2, 2, 2),
-        new THREE.SphereGeometry(1.5, 32, 16),
-        new THREE.ConeGeometry(1.5, 3, 32),
-        new THREE.TorusGeometry(1, 0.4, 16, 100)
-    ];
+    for (let i = 0; i < particleCount; i++) {
+        const i3 = i * 3;
+        
+        const radius = Math.random() * 80;
+        const spinAngle = radius * 3;
+        const branchAngle = (i % 5) / 5 * Math.PI * 2;
 
-    const material = new THREE.MeshStandardMaterial({
-        color: color,
-        roughness: 0.5,
-        metalness: 0.8,
-        emissive: color,
-        emissiveIntensity: 0.2,
+        const randomX = Math.pow(Math.random(), 3) * (Math.random() < 0.5 ? 1 : -1) * 0.5;
+        const randomY = Math.pow(Math.random(), 3) * (Math.random() < 0.5 ? 1 : -1) * 0.5;
+        const randomZ = Math.pow(Math.random(), 3) * (Math.random() < 0.5 ? 1 : -1) * 0.5;
+
+        positions[i3] = Math.cos(branchAngle + spinAngle) * radius + randomX;
+        positions[i3 + 1] = randomY;
+        positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+        
+        const mixedColor = primaryColor.clone();
+        mixedColor.lerp(accentColor, radius / 80);
+
+        colors[i3] = mixedColor.r;
+        colors[i3 + 1] = mixedColor.g;
+        colors[i3 + 2] = mixedColor.b;
+    }
+
+    const particlesGeometry = new THREE.BufferGeometry();
+    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const particlesMaterial = new THREE.PointsMaterial({
+        size: 0.2,
+        sizeAttenuation: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        vertexColors: true,
     });
     
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
+    const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+    scene.add(particles);
 
-    const pointLight = new THREE.PointLight(0xffffff, 1);
-    pointLight.position.set(50, 50, 50);
-    scene.add(pointLight);
-
-
-    for (let i = 0; i < shapeCount; i++) {
-        const geometry = geometries[Math.floor(Math.random() * geometries.length)];
-        const shape = new THREE.Mesh(geometry, material);
-        
-        shape.position.set(
-            (Math.random() - 0.5) * 100,
-            (Math.random() - 0.5) * 100,
-            (Math.random() - 0.5) * 100
-        );
-
-        shape.rotation.set(
-            Math.random() * Math.PI,
-            Math.random() * Math.PI,
-            Math.random() * Math.PI
-        );
-        
-        const scale = Math.random() * 0.5 + 0.5;
-        shape.scale.set(scale, scale, scale);
-
-        (shape as any).velocity = new THREE.Vector3(
-            (Math.random() - 0.5) * 0.1,
-            (Math.random() - 0.5) * 0.1,
-            (Math.random() - 0.5) * 0.1,
-        );
-
-        scene.add(shape);
-        shapes.push(shape);
-    }
-    
     const onMouseMove = (event: MouseEvent) => {
         if (currentMount) {
             mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
@@ -98,25 +89,19 @@ export default function ParticlesBackground() {
     }
     currentMount.addEventListener('mouseleave', onMouseLeave);
 
+    const clock = new THREE.Clock();
+
     const animate = () => {
-        requestAnimationFrame(animate);
+        const elapsedTime = clock.getElapsedTime();
+        
+        particles.rotation.y = elapsedTime * 0.1;
 
-        shapes.forEach(shape => {
-            shape.position.add((shape as any).velocity);
-            shape.rotation.x += 0.005;
-            shape.rotation.y += 0.005;
-
-            if (shape.position.x > 50 || shape.position.x < -50) (shape as any).velocity.x *= -1;
-            if (shape.position.y > 50 || shape.position.y < -50) (shape as any).velocity.y *= -1;
-            if (shape.position.z > 50 || shape.position.z < -50) (shape as any).velocity.z *= -1;
-        });
-
-
-        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.05;
-        camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.05;
+        camera.position.x += (mouse.x * 5 - camera.position.x) * 0.02;
+        camera.position.y += (-mouse.y * 5 - camera.position.y) * 0.02;
         camera.lookAt(scene.position);
       
         renderer.render(scene, camera);
+        requestAnimationFrame(animate);
     };
     animate();
 
@@ -140,18 +125,8 @@ export default function ParticlesBackground() {
                 currentMount.removeChild(renderer.domElement);
             }
         }
-        scene.traverse(object => {
-            if (object instanceof THREE.Mesh) {
-                if (object.geometry) {
-                    object.geometry.dispose();
-                }
-                if (Array.isArray(object.material)) {
-                    object.material.forEach(m => m.dispose());
-                } else if (object.material) {
-                    object.material.dispose();
-                }
-            }
-        });
+        particlesGeometry.dispose();
+        particlesMaterial.dispose();
     };
   }, []);
 
