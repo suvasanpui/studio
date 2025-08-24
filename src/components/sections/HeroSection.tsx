@@ -17,157 +17,118 @@ const HeroSection = () => {
 
     // Scene setup
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 5;
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+    camera.position.z = 1;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
 
-    const mouse = new THREE.Vector2(-10, -10);
+    const clock = new THREE.Clock();
 
-    // Particle setup
-    const particlesCount = 5000;
-    const positions = new Float32Array(particlesCount * 3);
-    const colors = new Float32Array(particlesCount * 3);
-    const sizes = new Float32Array(particlesCount);
-    const velocities = new Float32Array(particlesCount * 3);
-    const randoms = new Float32Array(particlesCount * 3);
-
-
-    const color = new THREE.Color();
-
-    for (let i = 0; i < particlesCount; i++) {
-        // Position
-        positions[i * 3] = (Math.random() - 0.5) * 10;
-        positions[i * 3 + 1] = (Math.random() - 0.5) * 10;
-        positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
-        
-        // Velocity
-        velocities[i * 3] = (Math.random() - 0.5) * 0.005;
-        velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.005;
-
-        // Random values for noise
-        randoms[i * 3] = Math.random() * 10;
-        randoms[i * 3 + 1] = Math.random() * 10;
-        randoms[i * 3 + 2] = Math.random() * 10;
-
-        // Color
-        color.setHSL(Math.random(), 0.7, 0.5);
-        colors[i * 3] = color.r;
-        colors[i * 3 + 1] = color.g;
-        colors[i * 3 + 2] = color.b;
-
-        // Size
-        sizes[i] = Math.random() * 0.1 + 0.05;
-    }
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-    geometry.setAttribute('randoms', new THREE.BufferAttribute(randoms, 3));
-    
+    // Metaballs shader
     const vertexShader = `
-      attribute float size;
-      attribute vec3 randoms;
-      varying vec3 vColor;
       void main() {
-        vColor = color;
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = size * (300.0 / -mvPosition.z);
-        gl_Position = projectionMatrix * mvPosition;
+        gl_Position = vec4(position, 1.0);
       }
     `;
 
     const fragmentShader = `
-      varying vec3 vColor;
+      uniform vec3 color1;
+      uniform vec3 color2;
+      uniform float time;
+      uniform vec2 resolution;
+      uniform vec2 mouse;
+      
+      const int NUM_METABALLS = 5;
+      vec3 metaballs[NUM_METABALLS];
+
+      float sdCircle(vec2 p, float r) {
+        return length(p) - r;
+      }
+      
       void main() {
-        float strength = distance(gl_PointCoord, vec2(0.5));
-        if (strength > 0.5) discard;
-        gl_FragColor = vec4(vColor, 1.0 - (strength * 2.0));
+        vec2 uv = (gl_FragCoord.xy * 2.0 - resolution.xy) / resolution.y;
+        
+        // Define metaballs
+        metaballs[0] = vec3(sin(time * 0.5) * 0.5, cos(time * 0.3) * 0.5, 0.2);
+        metaballs[1] = vec3(sin(time * 0.7) * 0.6, cos(time * 0.5) * 0.6, 0.25);
+        metaballs[2] = vec3(sin(time * 0.9) * 0.7, cos(time * 0.7) * 0.7, 0.15);
+        metaballs[3] = vec3(sin(time * 1.1) * 0.4, cos(time * 0.9) * 0.4, 0.2);
+        metaballs[4] = vec3(mouse.x * 2.0, mouse.y * 2.0, 0.3); // Mouse controlled
+
+        float sum = 0.0;
+        for (int i = 0; i < NUM_METABALLS; i++) {
+            sum += metaballs[i].z / length(uv - metaballs[i].xy);
+        }
+        
+        float threshold = 1.0;
+        float value = smoothstep(threshold - 0.05, threshold + 0.05, sum);
+        
+        if (value < 0.1) {
+          discard;
+        }
+
+        vec3 finalColor = mix(color1, color2, length(uv));
+        gl_FragColor = vec4(finalColor, value);
       }
     `;
 
+    const uniforms = {
+        time: { value: 0.0 },
+        resolution: { value: new THREE.Vector2(currentMount.clientWidth, currentMount.clientHeight) },
+        mouse: { value: new THREE.Vector2(0.5, 0.5) },
+        color1: { value: new THREE.Color(0x6a0dad) }, // Purple
+        color2: { value: new THREE.Color(0x00ffff) }, // Cyan
+    };
+
+    const geometry = new THREE.PlaneGeometry(2, 2);
     const material = new THREE.ShaderMaterial({
         vertexShader,
         fragmentShader,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
+        uniforms,
         transparent: true,
-        vertexColors: true,
     });
 
-    const particles = new THREE.Points(geometry, material);
-    scene.add(particles);
+    const plane = new THREE.Mesh(geometry, material);
+    scene.add(plane);
 
     const onMouseMove = (event: MouseEvent) => {
-      if (currentMount) {
-        mouse.x = (event.clientX / currentMount.clientWidth) * 2 - 1;
-        mouse.y = -(event.clientY / currentMount.clientHeight) * 2 + 1;
-      }
-    }
+        if (currentMount) {
+            uniforms.mouse.value.x = (event.clientX / currentMount.clientWidth) - 0.5;
+            uniforms.mouse.value.y = -( (event.clientY / currentMount.clientHeight) - 0.5);
+        }
+    };
     window.addEventListener('mousemove', onMouseMove);
-    
-    const clock = new THREE.Clock();
 
     const animate = () => {
-      requestAnimationFrame(animate);
-
-      const elapsedTime = clock.getElapsedTime();
-      const posAttribute = geometry.attributes.position as THREE.BufferAttribute;
-      const randAttribute = geometry.attributes.randoms as THREE.BufferAttribute;
-
-      for (let i = 0; i < particlesCount; i++) {
-        const i3 = i * 3;
-        
-        // Update position based on initial velocity
-        posAttribute.array[i3] += velocities[i3];
-        posAttribute.array[i3 + 1] += velocities[i3 + 1];
-
-        // Add noise for smoke-like movement
-        const xRand = randAttribute.array[i3];
-        const yRand = randAttribute.array[i3 + 1];
-        posAttribute.array[i3] += Math.sin(elapsedTime * 0.5 + xRand) * 0.001;
-        posAttribute.array[i3 + 1] += Math.cos(elapsedTime * 0.5 + yRand) * 0.001;
-
-        // Screen wrapping
-        if (posAttribute.array[i3] > 5) posAttribute.array[i3] = -5;
-        else if (posAttribute.array[i3] < -5) posAttribute.array[i3] = 5;
-        if (posAttribute.array[i3 + 1] > 5) posAttribute.array[i3 + 1] = -5;
-        else if (posAttribute.array[i3 + 1] < -5) posAttribute.array[i3 + 1] = 5;
-
-        // Mouse interaction
-        const mouseRadius = 1.5;
-        const mouse3D = new THREE.Vector3(mouse.x * 5, mouse.y * 5, 0);
-        const particlePos = new THREE.Vector3(posAttribute.array[i3], posAttribute.array[i3+1], posAttribute.array[i3+2]);
-        const dist = particlePos.distanceTo(mouse3D);
-
-        if(dist < mouseRadius) {
-           const force = (mouseRadius - dist) / mouseRadius;
-           const repel = particlePos.sub(mouse3D).normalize().multiplyScalar(force * 0.05);
-           velocities[i3] += repel.x;
-           velocities[i3+1] += repel.y;
-        }
-      }
-
-      // Dampen velocities
-      for(let i = 0; i < particlesCount * 3; i++) {
-        velocities[i] *= 0.99;
-      }
-
-      posAttribute.needsUpdate = true;
-      particles.rotation.z = elapsedTime * 0.05;
-
-      renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+        uniforms.time.value = clock.getElapsedTime();
+        renderer.render(scene, camera);
     };
     animate();
 
     const handleResize = () => {
-      camera.aspect = currentMount.clientWidth / currentMount.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
+        const width = currentMount.clientWidth;
+        const height = currentMount.clientHeight;
+        renderer.setSize(width, height);
+        uniforms.resolution.value.set(width, height);
+        // Adjust camera for non-square aspect ratios if needed
+        const aspect = width / height;
+        if (aspect > 1) {
+            camera.left = -aspect;
+            camera.right = aspect;
+            camera.top = 1;
+            camera.bottom = -1;
+        } else {
+            camera.left = -1;
+            camera.right = 1;
+            camera.top = 1 / aspect;
+            camera.bottom = -1 / aspect;
+        }
+        camera.updateProjectionMatrix();
     };
+    handleResize(); // Initial call
     window.addEventListener('resize', handleResize);
 
     return () => {
