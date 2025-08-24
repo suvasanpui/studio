@@ -121,7 +121,7 @@ export default function SkillsSection() {
                   transition={{ duration: 0.5 }}
                 >
                   <div className={cn('w-5/12', { 'order-last': !isLeft })}>
-                    <Card className="group relative overflow-hidden border-2 border-border bg-background/50 shadow-lg transition-all duration-300 hover:border-primary hover:-translate-y-1 hover:shadow-primary/20">
+                    <Card className="group relative overflow-hidden border-2 border-border bg-background/80 shadow-lg transition-all duration-300 hover:border-primary hover:-translate-y-1 hover:shadow-primary/20">
                       <CardContent className="flex items-center gap-4 p-4">
                         <div className="text-primary transition-transform duration-300 group-hover:scale-110">
                           {React.cloneElement(skill.icon, { className: 'h-8 w-8' })}
