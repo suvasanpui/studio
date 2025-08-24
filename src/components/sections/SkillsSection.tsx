@@ -30,53 +30,74 @@ export default function SkillsSection() {
     if (!mountRef.current) return;
     const currentMount = mountRef.current;
 
+    // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 5;
+    camera.position.z = 10;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
 
-    const particlesCount = 5000;
-    const positions = new Float32Array(particlesCount * 3);
-    for (let i = 0; i < particlesCount; i++) {
-      positions[i * 3 + 0] = (Math.random() - 0.5) * 10;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 10;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
+    // Starfield
+    const starCount = 10000;
+    const starGeometry = new THREE.BufferGeometry();
+    const starPositions = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
+
+    const baseColor = new THREE.Color('hsl(var(--primary))');
+
+    for (let i = 0; i < starCount; i++) {
+        const i3 = i * 3;
+        starPositions[i3] = (Math.random() - 0.5) * 100;
+        starPositions[i3 + 1] = (Math.random() - 0.5) * 100;
+        starPositions[i3 + 2] = (Math.random() - 0.5) * 100;
+
+        const color = new THREE.Color(baseColor);
+        color.lerp(new THREE.Color(0xffffff), Math.random() * 0.5);
+        starColors[i3] = color.r;
+        starColors[i3 + 1] = color.g;
+        starColors[i3 + 2] = color.b;
     }
-    const particlesGeometry = new THREE.BufferGeometry();
-    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const particlesMaterial = new THREE.PointsMaterial({
-      color: 'hsl(var(--primary))',
-      size: 0.02,
-      sizeAttenuation: true,
-      blending: THREE.AdditiveBlending,
+
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+    const starMaterial = new THREE.PointsMaterial({
+        size: 0.05,
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        opacity: 0.8
     });
-    const particles = new THREE.Points(particlesGeometry, particlesMaterial);
-    scene.add(particles);
+
+    const starfield = new THREE.Points(starGeometry, starMaterial);
+    scene.add(starfield);
 
     const mouse = new THREE.Vector2();
     const handleMouseMove = (event: MouseEvent) => {
-      const rect = currentMount.getBoundingClientRect();
-      mouse.x = ((event.clientX - rect.left) / currentMount.clientWidth) * 2 - 1;
-      mouse.y = -((event.clientY - rect.top) / currentMount.clientHeight) * 2 + 1;
+        const rect = currentMount.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / currentMount.clientWidth) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / currentMount.clientHeight) * 2 + 1;
     };
     window.addEventListener('mousemove', handleMouseMove);
-
+    
     const clock = new THREE.Clock();
+
     const animate = () => {
-      const elapsedTime = clock.getElapsedTime();
-      particles.rotation.y = elapsedTime * 0.05;
-      particles.rotation.x = elapsedTime * 0.02;
+        requestAnimationFrame(animate);
 
-      camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.05;
-      camera.position.y += (-mouse.y * 0.5 - camera.position.y) * 0.05;
-      camera.lookAt(scene.position);
+        const elapsedTime = clock.getElapsedTime();
+        starfield.position.z = (elapsedTime * 0.1) % 5;
+        
+        // Subtle mouse interaction
+        camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.02;
+        camera.position.y += (-mouse.y * 0.5 - camera.position.y) * 0.02;
+        camera.lookAt(scene.position);
 
-      renderer.render(scene, camera);
-      requestAnimationFrame(animate);
+        renderer.render(scene, camera);
     };
+
     animate();
 
     const handleResize = () => {
@@ -121,7 +142,7 @@ export default function SkillsSection() {
                   transition={{ duration: 0.5 }}
                 >
                   <div className={cn('w-5/12', { 'order-last': !isLeft })}>
-                    <Card className="group relative overflow-hidden border-2 border-border bg-background/80 shadow-lg transition-all duration-300 hover:border-primary hover:-translate-y-1 hover:shadow-primary/20">
+                    <Card className="group relative overflow-hidden border-2 border-border bg-background/80 shadow-lg transition-all duration-300 hover:border-primary hover:-translate-y-1 hover:shadow-primary/20 backdrop-blur-sm">
                       <CardContent className="flex items-center gap-4 p-4">
                         <div className="text-primary transition-transform duration-300 group-hover:scale-110">
                           {React.cloneElement(skill.icon, { className: 'h-8 w-8' })}
