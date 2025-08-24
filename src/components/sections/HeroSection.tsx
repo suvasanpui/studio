@@ -18,30 +18,50 @@ const HeroSection = () => {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-    camera.position.z = 5;
+    camera.position.z = 30;
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 
     renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     currentMount.appendChild(renderer.domElement);
-
-    const particleCount = 5000;
-    const particles = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-
-    for (let i = 0; i < particleCount * 3; i++) {
-      positions[i] = (Math.random() - 0.5) * 10;
-    }
-    particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     
-    const particleMaterial = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.015,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
+    const characters = ['{', '}', '[', ']', '(', ')', '/', '<', '>', '*', '=', '+', '-', '0', '1'];
+    const font = 'bold 20px "Space Mono", monospace';
+    const characterTextures = characters.map(char => {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d')!;
+        canvas.width = 32;
+        canvas.height = 32;
+        context.font = font;
+        context.fillStyle = '#00ff00'; // Accent color for code
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(char, 16, 16);
+        return new THREE.CanvasTexture(canvas);
     });
-    const particleSystem = new THREE.Points(particles, particleMaterial);
-    scene.add(particleSystem);
+
+    const particleCount = 1000;
+    const particles = new THREE.Group();
+    scene.add(particles);
+
+    for (let i = 0; i < particleCount; i++) {
+        const material = new THREE.SpriteMaterial({ 
+            map: characterTextures[Math.floor(Math.random() * characterTextures.length)],
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            opacity: 0.7,
+        });
+        const particle = new THREE.Sprite(material);
+        
+        particle.position.set(
+            (Math.random() - 0.5) * 100,
+            (Math.random() - 0.5) * 100,
+            (Math.random() - 0.5) * 100
+        );
+        (particle as any).velocity = new THREE.Vector3(0, -0.1 - Math.random() * 0.1, 0);
+        
+        particles.add(particle);
+    }
     
     const onMouseMove = (event: MouseEvent) => {
         mouse.current.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -56,11 +76,19 @@ const HeroSection = () => {
       
       const elapsedTime = clock.getElapsedTime();
 
-      particleSystem.rotation.y = elapsedTime * 0.1;
+      particles.children.forEach(p => {
+        const particle = p as THREE.Sprite & { velocity: THREE.Vector3 };
+        particle.position.add(particle.velocity);
+        if (particle.position.y < -50) {
+            particle.position.y = 50;
+            particle.position.x = (Math.random() - 0.5) * 100;
+        }
+      });
 
-      // Make particles react to mouse
-      camera.position.x += (mouse.current.x * 0.5 - camera.position.x) * 0.02;
-      camera.position.y += (mouse.current.y * 0.5 - camera.position.y) * 0.02;
+      particles.rotation.y = elapsedTime * 0.05;
+      
+      camera.position.x += (mouse.current.x * 5 - camera.position.x) * 0.02;
+      camera.position.y += (mouse.current.y * 5 - camera.position.y) * 0.02;
       camera.lookAt(scene.position);
 
       renderer.render(scene, camera);
@@ -86,7 +114,7 @@ const HeroSection = () => {
   return (
     <section className="relative h-screen w-full flex items-center justify-center overflow-hidden">
       <div ref={mountRef} className="absolute top-0 left-0 w-full h-full" />
-      <div className="absolute top-0 left-0 w-full h-full bg-background/70" />
+      <div className="absolute top-0 left-0 w-full h-full bg-background/80" />
 
       <motion.div 
         className="relative z-10 text-center px-4"
