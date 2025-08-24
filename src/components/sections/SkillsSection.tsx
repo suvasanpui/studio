@@ -48,7 +48,7 @@ export default function SkillsSection() {
                   viewport={{ once: true, amount: 0.5 }}
                   transition={{ duration: 0.5 }}
                 >
-                  <div className={cn('w-5/12 relative', { 'order-last': !isLeft })}>
+                  <div className={cn('w-5/12 relative z-10', { 'order-last': !isLeft })}>
                     <Card className="group relative overflow-hidden border-2 border-border bg-background/90 shadow-lg transition-all duration-300 hover:border-primary hover:-translate-y-1 hover:shadow-primary/20 backdrop-blur-sm">
                       <CardContent className="flex items-center gap-4 p-4">
                         <div className="text-primary transition-transform duration-300 group-hover:scale-110">
@@ -59,7 +59,7 @@ export default function SkillsSection() {
                     </Card>
                   </div>
                   <div className="absolute left-1/2 -translate-x-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background z-10" />
-                  <div className={cn('absolute top-1/2 h-0.5 w-[calc(50%-2rem)] bg-border', isLeft ? 'right-1/2 translate-x-4' : 'left-1/2 -translate-x-4')} />
+                  <div className={cn('absolute top-1/2 h-0.5 w-1/2 bg-border', isLeft ? 'right-1/2 pr-8' : 'left-1/2 pl-8')} />
                 </motion.div>
               );
             })}
