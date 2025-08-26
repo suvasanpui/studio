@@ -1,6 +1,7 @@
 'use client';
 
-import { Briefcase } from "lucide-react";
+import React from "react";
+import { Briefcase, Building, Code, Star } from "lucide-react";
 import AnimatedSection from "../shared/AnimatedSection";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui/card";
 import { motion } from "framer-motion";
@@ -35,6 +36,14 @@ const experienceData = [
   }
 ];
 
+const stats = [
+    { value: "2+", label: "Years Experience", icon: <Briefcase /> },
+    { value: "10+", label: "Projects Completed", icon: <Star /> },
+    { value: "15+", label: "Technologies", icon: <Code /> },
+    { value: "5+", label: "Companies", icon: <Building /> },
+];
+
+
 export default function ExperienceSection() {
   return (
     <AnimatedSection id="experience" className="bg-background relative overflow-hidden">
@@ -47,6 +56,31 @@ export default function ExperienceSection() {
             My professional journey and what I've accomplished so far.
           </p>
         </div>
+
+        <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {stats.map((stat, index) => (
+                <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 50 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.3 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                    <Card className="text-center bg-secondary/50 hover:bg-secondary/80 transition-colors duration-300 shadow-lg hover:shadow-primary/20">
+                        <CardHeader>
+                            <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-primary/10 text-primary">
+                                {React.cloneElement(stat.icon, { className: "h-6 w-6" })}
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-4xl font-bold font-headline text-primary">{stat.value}</p>
+                            <p className="mt-2 text-muted-foreground">{stat.label}</p>
+                        </CardContent>
+                    </Card>
+                </motion.div>
+            ))}
+        </div>
+
         <div className="mt-16 relative">
           <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-border -translate-x-1/2 hidden md:block" />
           <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border md:hidden" />
