@@ -1,99 +1,102 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { Sparkles } from 'lucide-react';
 
-export default function HeroAnimation() {
-  const mountRef = useRef<HTMLDivElement>(null);
+const HeroAnimation: React.FC = () => {
+    const mountRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!mountRef.current) return;
-    const mount = mountRef.current;
+    useEffect(() => {
+        if (!mountRef.current) return;
+        const currentMount = mountRef.current;
 
-    let primaryColorValue: string;
-    try {
-        const computedStyle = getComputedStyle(document.documentElement);
-        const primaryColorHsl = computedStyle.getPropertyValue('--primary').trim();
-        const [h, s, l] = primaryColorHsl.split(" ").map(s => s.replace('%',''));
-        primaryColorValue = `hsl(${h}, ${s}%, ${l}%)`;
-    } catch(e) {
-        primaryColorValue = `hsl(277, 87%, 53%)`;
-    }
-    const primaryColor = new THREE.Color(primaryColorValue);
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(30, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
+        camera.position.set(0, 4, 12);
 
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        currentMount.appendChild(renderer.domElement);
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, mount.clientWidth / mount.clientHeight, 0.1, 1000);
-    camera.position.z = 2.5;
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableZoom = false;
+        controls.enablePan = false;
+        controls.minPolarAngle = Math.PI / 3;
+        controls.maxPolarAngle = Math.PI / 2;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.5;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(mount.clientWidth, mount.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    mount.appendChild(renderer.domElement);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+        scene.add(ambientLight);
 
-    const geometry = new THREE.IcosahedronGeometry(1, 15);
-    const material = new THREE.MeshStandardMaterial({
-        color: primaryColor,
-        emissive: primaryColor,
-        emissiveIntensity: 0.2,
-        roughness: 0.4,
-        metalness: 0.6,
-        wireframe: true,
-        wireframeLinewidth: 1,
-    });
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+        directionalLight.position.set(5, 10, 7.5);
+        scene.add(directionalLight);
 
-    const sphere = new THREE.Mesh(geometry, material);
-    scene.add(sphere);
-    
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
-    scene.add(ambientLight);
+        const loader = new GLTFLoader();
+        loader.load('/desktop_computer/scene.gltf', (gltf) => {
+            const model = gltf.scene;
+            model.scale.set(1.5, 1.5, 1.5);
+            model.position.y = -1.5;
+            scene.add(model);
+        }, undefined, (error) => {
+            console.error(error);
+        });
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(5, 5, 5);
-    scene.add(directionalLight);
+        const animate = () => {
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        };
+        animate();
 
-    const mouse = { x: 0, y: 0 };
-    const handleMouseMove = (event: MouseEvent) => {
-        const rect = mount.getBoundingClientRect();
-        mouse.x = ((event.clientX - rect.left) / mount.clientWidth) * 2 - 1;
-        mouse.y = -((event.clientY - rect.top) / mount.clientHeight) * 2 + 1;
-    };
-    mount.addEventListener('mousemove', handleMouseMove);
+        const handleResize = () => {
+            if (!mountRef.current) return;
+            camera.aspect = currentMount.clientWidth / currentMount.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
+        };
 
-    const clock = new THREE.Clock();
+        window.addEventListener('resize', handleResize);
 
-    const animate = () => {
-        const elapsedTime = clock.getElapsedTime();
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            if (currentMount) {
+                currentMount.removeChild(renderer.domElement);
+            }
+        };
+    }, []);
 
-        sphere.rotation.y = elapsedTime * 0.1;
+    return (
+        <div className='relative w-full h-[300px] md:h-[400px] flex flex-col items-center justify-center'>
+            <div ref={mountRef} className='w-full h-full' />
+            <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className="cursor-pointer w-auto">
+                                <div className="p-3 rounded-lg border bg-background/50 backdrop-blur-sm">
+                                    <h3 className="font-headline text-lg flex items-center gap-2">
+                                        <Sparkles className="text-accent h-5 w-5" /> Magic
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground mt-1">Do you know? You can tilt and rotate me!</p>
+                                </div>
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Drag the model to rotate</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
+        </div>
+    )
+};
 
-        const targetRotationX = mouse.y * 0.5;
-        const targetRotationY = mouse.x * 0.5;
-        sphere.rotation.x += (targetRotationX - sphere.rotation.x) * 0.05;
-        sphere.rotation.y += (targetRotationY - sphere.rotation.y) * 0.05 + 0.001;
-
-
-        renderer.render(scene, camera);
-        requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    const handleResize = () => {
-      camera.aspect = mount.clientWidth / mount.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(mount.clientWidth, mount.clientHeight);
-    };
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-        mount.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('resize', handleResize);
-        if (mount && renderer.domElement) {
-            mount.removeChild(renderer.domElement);
-        }
-    };
-  }, []);
-
-  return <div ref={mountRef} style={{ width: '100%', height: '400px' }} />;
-}
+export default HeroAnimation;

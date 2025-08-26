@@ -3,7 +3,6 @@
 import { Briefcase } from "lucide-react";
 import AnimatedSection from "../shared/AnimatedSection";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui/card";
-import ParticlesBackground from "../shared/ParticlesBackground";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +38,6 @@ const experienceData = [
 export default function ExperienceSection() {
   return (
     <AnimatedSection id="experience" className="bg-background relative overflow-hidden">
-      <ParticlesBackground />
       <div className='relative z-10'>
         <div className="text-center">
           <h2 className="font-headline text-4xl md:text-5xl font-bold tracking-tighter">

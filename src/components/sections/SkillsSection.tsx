@@ -6,7 +6,6 @@ import AnimatedSection from '../shared/AnimatedSection';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Code, Database, GitMerge, Settings, Brush, Zap, Cloud, Server, FileCode, ToyBrick, Box, Package } from 'lucide-react';
-import ParticlesBackground from '../shared/ParticlesBackground';
 
 const skills = [
   { name: 'React', icon: <Package /> },
@@ -26,7 +25,6 @@ const skills = [
 export default function SkillsSection() {
   return (
     <AnimatedSection id="skills" className="relative overflow-hidden bg-background">
-      <ParticlesBackground />
       <div className="relative z-10">
         <div className="text-center">
           <h2 className="font-headline text-4xl md:text-5xl font-bold tracking-tighter">My Tech Arsenal</h2>

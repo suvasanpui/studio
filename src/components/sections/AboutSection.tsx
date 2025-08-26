@@ -5,7 +5,6 @@ import AnimatedSection from "../shared/AnimatedSection";
 import Image from "next/image";
 import { Briefcase, GraduationCap } from "lucide-react";
 import { motion } from 'framer-motion';
-import ParticlesBackground from '../shared/ParticlesBackground';
 
 const timelineItems = [
   {
@@ -34,7 +33,6 @@ const timelineItems = [
 export default function AboutSection() {
   return (
     <AnimatedSection id="about" className="bg-secondary relative overflow-hidden">
-      <ParticlesBackground />
       <div className="relative z-10 grid md:grid-cols-5 gap-12 items-start">
         <div className="md:col-span-2">
           <div className="relative aspect-square w-full max-w-sm mx-auto">
