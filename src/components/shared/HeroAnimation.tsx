@@ -40,10 +40,10 @@ const HeroAnimation: React.FC = () => {
         scene.add(directionalLight);
 
         const loader = new GLTFLoader();
-        loader.load('https://cdn.jsdelivr.net/gh/suvasanpui/3D-Model-Source-for-SAAS@main/desktop_computer/scene.gltf', (gltf) => {
+        loader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/models/gltf/LittlestTokyo.glb', (gltf) => {
             const model = gltf.scene;
-            model.scale.set(1.5, 1.5, 1.5);
-            model.position.y = -1.5;
+            model.scale.set(0.015, 0.015, 0.015);
+            model.position.y = -1;
             scene.add(model);
         }, undefined, (error) => {
             console.error(error);
