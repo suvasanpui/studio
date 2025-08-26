@@ -21,6 +21,19 @@ const experienceData = [
       "Managed databases and performed regular maintenance."
     ]
   },
+  {
+    role: "Junior Web Developer",
+    company: "Tech Innovators Inc.",
+    period: "2022 - 2023",
+    description: "I began my professional journey as a Junior Web Developer, where I contributed to the development of various client websites. This role allowed me to hone my front-end skills and learn the fundamentals of back-end development in a collaborative team environment.",
+    responsibilities: [
+      "Assisted in the development of new user-facing features using React.",
+      "Translated UI/UX design wireframes to actual code.",
+      "Learned to build and maintain server-side APIs with Node.js and Express.",
+      "Participated in code reviews to maintain code quality.",
+      "Fixed bugs and improved application performance."
+    ]
+  }
 ];
 
 export default function ExperienceSection() {
