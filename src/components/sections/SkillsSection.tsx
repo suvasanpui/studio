@@ -5,22 +5,22 @@ import { motion } from 'framer-motion';
 import AnimatedSection from '../shared/AnimatedSection';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Code, Database, GitMerge, Settings, Brush, Zap, Cloud } from 'lucide-react';
+import { Code, Database, GitMerge, Settings, Brush, Zap, Cloud, Server, FileCode, ToyBrick, Box, Package } from 'lucide-react';
 import ParticlesBackground from '../shared/ParticlesBackground';
 
 const skills = [
-  { name: 'React', icon: <Code /> },
-  { name: 'Node.js', icon: <Zap /> },
+  { name: 'React', icon: <Package /> },
+  { name: 'Node.js', icon: <Server /> },
   { name: 'Express', icon: <Zap /> },
   { name: 'MongoDB', icon: <Database /> },
-  { name: 'JavaScript', icon: <Code /> },
-  { name: 'TypeScript', icon: <Code /> },
+  { name: 'JavaScript', icon: <FileCode /> },
+  { name: 'TypeScript', icon: <FileCode /> },
   { name: 'Next.js', icon: <Zap /> },
   { name: 'Tailwind CSS', icon: <Brush /> },
   { name: 'Git', icon: <GitMerge /> },
-  { name: 'Redux', icon: <Settings /> },
+  { name: 'Redux', icon: <ToyBrick /> },
   { name: 'Firebase', icon: <Cloud /> },
-  { name: 'Three.js', icon: <Brush /> },
+  { name: 'Three.js', icon: <Box /> },
 ];
 
 export default function SkillsSection() {
