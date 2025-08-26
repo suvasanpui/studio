@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { ThemeToggleButton } from './ThemeToggleButton';
 
 const navLinks = [
+  { href: "#home", label: "Home" },
   { href: "#about", label: "About" },
   { href: "#experience", label: "Experience" },
   { href: "#skills", label: "Skills" },
@@ -18,14 +19,25 @@ const navLinks = [
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
+  const [activeLink, setActiveLink] = useState('#home');
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
+      const sections = navLinks.map(link => document.querySelector(link.href));
+      const scrollPosition = window.scrollY + 100;
+      
+      sections.forEach(section => {
+        if (section && section.offsetTop <= scrollPosition && section.offsetTop + section.offsetHeight > scrollPosition) {
+          setActiveLink(`#${section.id}`);
+        }
+      });
     };
+    
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+  
 
   return (
     <header className={cn(
@@ -37,11 +49,16 @@ export default function Header() {
           <Code className="h-8 w-8 text-primary" />
           <span>Suva</span>
         </Link>
-        <nav className="hidden items-center gap-6 md:flex">
+        <nav className="hidden items-center gap-1 md:flex">
           {navLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="text-lg font-medium text-foreground/80 transition-colors hover:text-primary">
-              {link.label}
-            </Link>
+            <Button key={link.href} variant="ghost" asChild
+              className={cn(
+                "text-lg font-medium text-foreground/80 transition-colors hover:text-primary",
+                activeLink === link.href && "text-primary bg-primary/10"
+              )}
+            >
+              <Link href={link.href}>{link.label}</Link>
+            </Button>
           ))}
         </nav>
         <div className="flex items-center gap-4">
@@ -64,9 +81,14 @@ export default function Header() {
                 </Link>
                 <nav className="grid gap-4">
                   {navLinks.map((link) => (
-                    <Link key={link.href} href={link.href} className="text-xl font-medium text-foreground/80 transition-colors hover:text-primary">
-                      {link.label}
-                    </Link>
+                     <Button key={link.href} variant="ghost" asChild
+                      className={cn(
+                        "text-xl font-medium text-foreground/80 transition-colors hover:text-primary justify-start",
+                        activeLink === link.href && "text-primary bg-primary/10"
+                      )}
+                    >
+                      <Link href={link.href}>{link.label}</Link>
+                    </Button>
                   ))}
                 </nav>
               </div>
