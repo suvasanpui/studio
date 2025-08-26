@@ -3,6 +3,7 @@
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { Sparkles } from 'lucide-react';
@@ -39,7 +40,12 @@ const HeroAnimation: React.FC = () => {
         directionalLight.position.set(5, 10, 7.5);
         scene.add(directionalLight);
 
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
+
         const loader = new GLTFLoader();
+        loader.setDRACOLoader(dracoLoader);
+        
         loader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/models/gltf/LittlestTokyo.glb', (gltf) => {
             const model = gltf.scene;
             model.scale.set(0.015, 0.015, 0.015);
