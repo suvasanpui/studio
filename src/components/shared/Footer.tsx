@@ -30,10 +30,10 @@ export default function Footer() {
             </Card>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 items-center">
-            <div className="flex flex-col items-center md:items-start text-center md:text-left">
+        <div className="flex flex-col items-center gap-8">
+            <div className="flex flex-col items-center text-center">
                 <h3 className="font-headline text-2xl font-bold">Connect with Me</h3>
-                <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-6">
+                <div className="flex flex-wrap justify-center gap-4 mt-6">
                     {socialLinks.map(link => (
                         <Button key={link.name} variant="outline" size="lg" asChild className="flex-1 min-w-[120px] bg-background/50 hover:bg-background">
                             <Link href={link.url} target="_blank" rel="noopener noreferrer">
@@ -45,8 +45,8 @@ export default function Footer() {
                 </div>
             </div>
             
-            <div className="md:col-span-2 text-center md:text-right text-muted-foreground">
-                 <p>© {year} Suva Sanpui. All rights reserved.</p>
+            <div className="text-center text-muted-foreground">
+                 <p>© 2025 Suva Sanpui. All rights reserved.</p>
                  <Link href="#" className="inline-flex items-center gap-2 mt-4 hover:text-primary transition-colors">
                     <Heart className="h-4 w-4" />
                     <span>Credits and attributions</span>
