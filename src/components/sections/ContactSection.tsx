@@ -10,6 +10,7 @@ import { submitContactForm } from "@/app/actions";
 import { useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import SubmitButton from '../shared/SubmitButton';
+import ParticlesBackground from '../shared/ParticlesBackground';
 
 const initialState = {
   message: '',
@@ -41,8 +42,9 @@ export default function ContactSection() {
   }, [state, toast]);
 
   return (
-    <AnimatedSection id="contact">
-      <div className="grid md:grid-cols-2 gap-12 items-center">
+    <AnimatedSection id="contact" className='relative overflow-hidden'>
+      <ParticlesBackground />
+      <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
         <div>
           <h2 className="font-headline text-4xl md:text-5xl font-bold tracking-tighter">
             Get In Touch

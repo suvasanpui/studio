@@ -5,6 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Github, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import ParticlesBackground from "../shared/ParticlesBackground";
 
 const projects = [
   {
@@ -30,6 +31,7 @@ const projects = [
 export default function ProjectsSection() {
   return (
     <AnimatedSection id="projects" className="bg-secondary relative overflow-hidden">
+      <ParticlesBackground />
       <div className="relative z-10">
         <div className="text-center">
           <h2 className="font-headline text-4xl md:text-5xl font-bold tracking-tighter">
