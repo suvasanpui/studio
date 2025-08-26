@@ -40,7 +40,7 @@ const HeroAnimation: React.FC = () => {
         scene.add(directionalLight);
 
         const loader = new GLTFLoader();
-        loader.load('/desktop_computer/scene.gltf', (gltf) => {
+        loader.load('https://cdn.jsdelivr.net/gh/suvasanpui/3D-Model-Source-for-SAAS@main/desktop_computer/scene.gltf', (gltf) => {
             const model = gltf.scene;
             model.scale.set(1.5, 1.5, 1.5);
             model.position.y = -1.5;
