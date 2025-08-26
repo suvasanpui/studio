@@ -2,19 +2,11 @@
 
 import React from 'react';
 import AnimatedSection from "../shared/AnimatedSection";
-import Image from "next/image";
-import { Briefcase, GraduationCap } from "lucide-react";
+import { GraduationCap } from "lucide-react";
 import { motion } from 'framer-motion';
 import ParticlesBackground from '../shared/ParticlesBackground';
 
 const timelineItems = [
-  {
-    icon: <Briefcase className="h-5 w-5 text-primary" />,
-    date: "2023 - Present",
-    title: "Full Stack Developer",
-    institution: "Freelance",
-    description: "Developing and maintaining web applications using the MERN stack for various clients, focusing on performance and user experience.",
-  },
   {
     icon: <GraduationCap className="h-5 w-5 text-primary" />,
     date: "2019 - 2023",
@@ -31,39 +23,15 @@ const timelineItems = [
   },
 ];
 
-export default function AboutSection() {
+export default function EducationSection() {
   return (
-    <AnimatedSection id="about" className="bg-secondary relative overflow-hidden">
+    <AnimatedSection id="education" className="bg-secondary relative overflow-hidden">
       <ParticlesBackground />
-      <div className="relative z-10 grid md:grid-cols-5 gap-12 items-start">
-        <div className="md:col-span-2">
-          <div className="relative aspect-square w-full max-w-sm mx-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              <Image
-                src="https://placehold.co/400x400.png"
-                alt="Suva Sanpui"
-                layout="fill"
-                objectFit="cover"
-                className="rounded-lg shadow-lg"
-                data-ai-hint="portrait man"
-              />
-              <div className="absolute -inset-2 rounded-lg border-2 border-primary/50 rotate-3 transition-transform duration-500 hover:rotate-0"></div>
-            </motion.div>
-          </div>
-        </div>
-        <div className="md:col-span-3">
-          <h2 className="font-headline text-4xl md:text-5xl font-bold tracking-tighter">
-            About Me
+      <div className="relative z-10">
+          <h2 className="font-headline text-4xl md:text-5xl font-bold tracking-tighter text-center">
+            My Education
           </h2>
-          <p className="mt-6 text-lg text-foreground/80 leading-relaxed">
-            I am a passionate Full Stack Developer with a knack for creating dynamic and user-friendly web applications. With a strong foundation in the MERN stack, I enjoy bringing ideas to life from concept to deployment. I am a continuous learner, always excited to explore new technologies and improve my craft.
-          </p>
-          <div className="mt-10">
+          <div className="mt-10 max-w-3xl mx-auto">
             <div className="relative">
               <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-border -z-10"></div>
               {timelineItems.map((item, index) => (
@@ -78,7 +46,7 @@ export default function AboutSection() {
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 ring-8 ring-secondary flex-shrink-0 mt-1">
                     {item.icon}
                   </div>
-                  <div className='bg-secondary/80 backdrop-blur-sm p-4 rounded-lg'>
+                  <div className='bg-secondary/80 backdrop-blur-sm p-4 rounded-lg w-full'>
                     <p className="text-sm text-muted-foreground">{item.date}</p>
                     <h3 className="text-xl font-semibold font-headline mt-1">{item.title}</h3>
                     <p className="text-lg text-primary font-medium">{item.institution}</p>
@@ -88,7 +56,6 @@ export default function AboutSection() {
               ))}
             </div>
           </div>
-        </div>
       </div>
     </AnimatedSection>
   );
