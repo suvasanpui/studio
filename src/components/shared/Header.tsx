@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Menu, Code } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { ThemeToggleButton } from './ThemeToggleButton';
@@ -54,6 +54,9 @@ export default function Header() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle className="sr-only">Mobile Navigation Menu</SheetTitle>
+              </SheetHeader>
               <div className="grid gap-6 p-6">
                 <Link href="/" className="flex items-center gap-2 font-headline text-2xl font-bold">
                   <Code className="h-8 w-8 text-primary" />
