@@ -35,20 +35,21 @@ export default function SkillsSection() {
           </p>
         </div>
         <div className="mt-16 relative">
-          <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-border -translate-x-1/2" />
+          <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-border -translate-x-1/2 hidden md:block" />
+          <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border md:hidden" />
           <div className="space-y-8">
             {skills.map((skill, index) => {
               const isLeft = index % 2 === 0;
               return (
                 <motion.div
                   key={skill.name}
-                  className={cn('relative flex items-center', isLeft ? 'justify-start' : 'justify-end')}
+                  className={cn('relative flex items-center md:justify-start', isLeft ? 'md:flex-row' : 'md:flex-row-reverse')}
                   initial={{ opacity: 0, x: isLeft ? -100 : 100 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true, amount: 0.5 }}
                   transition={{ duration: 0.5 }}
                 >
-                  <div className={cn('w-5/12 relative z-10')}>
+                  <div className={cn('w-full md:w-5/12 relative z-10 pl-12 md:pl-0')}>
                     <Card className="group relative overflow-hidden border-2 border-border bg-background/90 shadow-lg transition-all duration-300 hover:border-primary hover:-translate-y-1 hover:shadow-primary/20 backdrop-blur-sm">
                       <CardContent className="flex items-center gap-4 p-4">
                         <div className="text-primary transition-transform duration-300 group-hover:scale-110">
@@ -58,8 +59,9 @@ export default function SkillsSection() {
                       </CardContent>
                     </Card>
                   </div>
-                  <div className="absolute left-1/2 -translate-x-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background z-10" />
-                  <div className={cn('absolute top-1/2 h-0.5 bg-border', isLeft ? 'left-0 w-1/2' : 'right-0 w-1/2')} />
+                  <div className="absolute left-1/2 -translate-x-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background z-10 hidden md:block" />
+                  <div className="absolute left-4 -translate-x-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background z-10 md:hidden" />
+                  <div className={cn('absolute top-1/2 h-0.5 bg-border hidden md:block', isLeft ? 'left-0 w-1/2' : 'right-0 w-1/2')} />
                 </motion.div>
               );
             })}
